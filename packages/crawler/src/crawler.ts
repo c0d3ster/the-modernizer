@@ -18,14 +18,10 @@ const delay = (ms: number): Promise<void> =>
 
 const fetchPage = async (url: string): Promise<{ html: string; statusCode: number; finalUrl: string; fetchMethod: 'static' | 'playwright' } | null> => {
   const staticResult = await staticFetch(url)
-  if (staticResult) {
-    return { ...staticResult, fetchMethod: 'static' }
-  }
+  if (staticResult) return { ...staticResult, fetchMethod: 'static' }
 
   const playwrightResult = await playwrightFetch(url)
-  if (playwrightResult) {
-    return { ...playwrightResult, fetchMethod: 'playwright' }
-  }
+  if (playwrightResult) return { ...playwrightResult, fetchMethod: 'playwright' }
 
   return null
 }
@@ -34,7 +30,11 @@ export const crawl = async (
   seedUrl: string,
   options: CrawlOptions = {}
 ): Promise<CrawlResult[]> => {
-  const opts = { ...DEFAULT_OPTIONS, ...options }
+  const opts = {
+    ...DEFAULT_OPTIONS,
+    ...options,
+    concurrency: Math.max(1, options.concurrency ?? DEFAULT_OPTIONS.concurrency),
+  }
   const rootUrl = normalizeUrl(seedUrl)
 
   const disallowedPaths = opts.respectRobotsTxt
@@ -48,7 +48,6 @@ export const crawl = async (
   const queue: Array<[string, number]> = [[rootUrl, 0]]
 
   while (queue.length > 0 && results.length < opts.maxPages) {
-    // pull a batch up to concurrency limit
     const batch = queue.splice(0, opts.concurrency)
 
     await Promise.all(
@@ -61,6 +60,10 @@ export const crawl = async (
         if (!result) return
 
         const { html, statusCode, finalUrl, fetchMethod } = result
+
+        // mark the canonical (post-redirect) URL visited too
+        const normalizedFinal = normalizeUrl(finalUrl)
+        visited.add(normalizedFinal)
 
         const internalLinks = depth < opts.maxDepth
           ? extractLinks(html, finalUrl, rootUrl)

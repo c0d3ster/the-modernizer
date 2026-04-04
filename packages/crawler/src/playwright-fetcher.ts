@@ -1,15 +1,23 @@
 import { type Browser, chromium } from 'playwright'
 
 let browser: Browser | null = null
+let launching: Promise<Browser> | null = null
 
 const getBrowser = async (): Promise<Browser> => {
-  if (!browser || !browser.isConnected()) {
-    browser = await chromium.launch({ headless: true })
-  }
-  return browser
+  if (browser?.isConnected()) return browser
+  if (launching) return launching
+
+  launching = chromium.launch({ headless: true }).then((b) => {
+    browser = b
+    launching = null
+    return b
+  })
+
+  return launching
 }
 
 export const closeBrowser = async (): Promise<void> => {
+  if (launching) await launching
   if (browser) {
     await browser.close()
     browser = null
@@ -23,24 +31,17 @@ export interface PlaywrightFetchResult {
 }
 
 export const playwrightFetch = async (url: string): Promise<PlaywrightFetchResult | null> => {
+  const b = await getBrowser()
+  const page = await b.newPage()
   try {
-    const b = await getBrowser()
-    const page = await b.newPage()
-
-    let statusCode = 200
-    page.on('response', (response) => {
-      if (response.url() === url || response.url() === `${url}/`) {
-        statusCode = response.status()
-      }
-    })
-
-    await page.goto(url, { waitUntil: 'networkidle', timeout: 30000 })
+    const response = await page.goto(url, { waitUntil: 'networkidle', timeout: 30000 })
     const html = await page.content()
     const finalUrl = page.url()
-    await page.close()
-
+    const statusCode = response?.status() ?? 200
     return { html, statusCode, finalUrl }
   } catch {
     return null
+  } finally {
+    await page.close()
   }
 }

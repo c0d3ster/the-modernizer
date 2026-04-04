@@ -22,6 +22,7 @@ export const staticFetch = async (url: string): Promise<StaticFetchResult | null
         'accept': 'text/html,application/xhtml+xml',
       },
       redirect: 'follow',
+      signal: AbortSignal.timeout(30000),
     })
 
     if (!response.ok) return null
