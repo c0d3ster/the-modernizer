@@ -47,57 +47,59 @@ export const crawl = async (
   // queue entries: [url, depth]
   const queue: Array<[string, number]> = [[rootUrl, 0]]
 
-  while (queue.length > 0 && results.length < opts.maxPages) {
-    const batch = queue.splice(0, opts.concurrency)
+  try {
+    while (queue.length > 0 && results.length < opts.maxPages) {
+      const batch = queue.splice(0, opts.concurrency)
 
-    await Promise.all(
-      batch.map(async ([url, depth]) => {
-        if (visited.has(url)) return
-        if (!isAllowed(url, disallowedPaths)) return
-        visited.add(url)
+      await Promise.all(
+        batch.map(async ([url, depth]) => {
+          if (visited.has(url)) return
+          if (!isAllowed(url, disallowedPaths)) return
+          visited.add(url)
 
-        const result = await fetchPage(url)
-        if (!result) return
+          const result = await fetchPage(url)
+          if (!result) return
 
-        const { html, statusCode, finalUrl, fetchMethod } = result
+          const { html, statusCode, finalUrl, fetchMethod } = result
 
-        // mark the canonical (post-redirect) URL visited too
-        const normalizedFinal = normalizeUrl(finalUrl)
-        visited.add(normalizedFinal)
+          // mark the canonical (post-redirect) URL visited too
+          const normalizedFinal = normalizeUrl(finalUrl)
+          visited.add(normalizedFinal)
 
-        const internalLinks = depth < opts.maxDepth
-          ? extractLinks(html, finalUrl, rootUrl)
-          : []
+          const internalLinks = depth < opts.maxDepth
+            ? extractLinks(html, finalUrl, rootUrl)
+            : []
 
-        if (results.length >= opts.maxPages) return
+          if (results.length >= opts.maxPages) return
 
-        results.push({
-          url,
-          finalUrl,
-          title: extractTitle(html),
-          rawHtml: html,
-          statusCode,
-          fetchMethod,
-          images: extractImages(html, finalUrl),
-          assets: [],
-          internalLinks,
-          crawledAt: new Date().toISOString(),
-        })
+          results.push({
+            url,
+            finalUrl,
+            title: extractTitle(html),
+            rawHtml: html,
+            statusCode,
+            fetchMethod,
+            images: extractImages(html, finalUrl),
+            assets: [],
+            internalLinks,
+            crawledAt: new Date().toISOString(),
+          })
 
-        for (const link of internalLinks) {
-          if (!visited.has(link)) {
-            queue.push([link, depth + 1])
+          for (const link of internalLinks) {
+            if (!visited.has(link)) {
+              queue.push([link, depth + 1])
+            }
           }
-        }
-      })
-    )
+        })
+      )
 
-    if (queue.length > 0 && opts.delayMs > 0) {
-      await delay(opts.delayMs)
+      if (queue.length > 0 && opts.delayMs > 0) {
+        await delay(opts.delayMs)
+      }
     }
+  } finally {
+    await closeBrowser()
   }
-
-  await closeBrowser()
 
   return results
 }
