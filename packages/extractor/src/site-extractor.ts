@@ -13,7 +13,7 @@ const socialLinkSchema = z.object({
 const siteExtractionResponseSchema = z.object({
   siteName: z.string(),
   tagline: z.string().optional(),
-  brandColors: brandColorsSchema,
+  brandColors: brandColorsSchema.optional(),
   nav: z.array(navItemSchema),
   footer: z
     .object({
@@ -42,12 +42,18 @@ export const extractSiteData = async (
   const prompt = extractSitePrompt(chromeHtml, rootUrl)
   const raw = await callLlm(prompt)
   const parsed = parseJsonResponse<unknown>(raw)
-  const validated = siteExtractionResponseSchema.parse(parsed)
+
+  const result = siteExtractionResponseSchema.safeParse(parsed)
+  if (!result.success) {
+    console.error('site extraction raw response:', raw)
+    throw result.error
+  }
+  const validated = result.data
 
   return {
     siteName: validated.siteName,
     tagline: validated.tagline,
-    brandColors: validated.brandColors,
+    brandColors: validated.brandColors ?? { primary: '#000000' },
     nav: validated.nav as NavItem[],
     footerPhone: validated.footer?.phone,
     footerEmail: validated.footer?.email,

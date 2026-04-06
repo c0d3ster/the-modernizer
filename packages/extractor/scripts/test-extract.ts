@@ -11,10 +11,15 @@
 // To produce fixtures, run:
 //   pnpm --filter @modernizer/crawler crawl https://edgehillrecovery.org --save ../extractor/fixtures/edgehill.json
 
-import { readFile, writeFile, mkdir } from 'node:fs/promises'
-import { dirname } from 'node:path'
+import { config } from 'dotenv'
+import { readFile, mkdir } from 'node:fs/promises'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import type { CrawlResult } from '@modernizer/schema'
 import { extract } from '../src/index.js'
+
+const __dirname = dirname(fileURLToPath(import.meta.url))
+config({ path: resolve(__dirname, '../../../.env') })
 
 const args = process.argv.slice(2)
 const outFlag = args.indexOf('--out')

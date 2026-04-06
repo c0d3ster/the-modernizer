@@ -17,33 +17,41 @@ export const extract = async (
   crawlResults: CrawlResult[],
   options: ExtractOptions = {}
 ): Promise<SiteSchema> => {
-  const rootUrl = crawlResults[0]?.url ?? ''
+  const seen = new Set<string>()
+  const uniqueResults = crawlResults.filter((r) => {
+    if (seen.has(r.finalUrl)) return false
+    seen.add(r.finalUrl)
+    return true
+  })
+
+  const rootUrl = uniqueResults[0]?.url ?? ''
 
   // --- deterministic passes ---
   const { contentHtml, chromeHtml } = stripChrome(
-    crawlResults.map((r) => ({ url: r.url, rawHtml: r.rawHtml }))
+    uniqueResults.map((r) => ({ url: r.url, rawHtml: r.rawHtml }))
   )
 
   // --- LLM: site-level data from chrome (1 call) ---
   const siteData = await extractSiteData(chromeHtml, rootUrl)
 
-  // --- LLM: per-page block classification (1 call per page) ---
-  const pages = await Promise.all(
-    crawlResults.map(async (result) => {
-      const html = contentHtml[result.url] ?? result.rawHtml
-      const metadata = extractMetadata(result.rawHtml, result.url)
-      const rawBlocks = splitBlocks(html)
-      const { archetype, blocks } = await classifyBlocks(metadata.title, rawBlocks)
+  // --- LLM: per-page block classification (1 call per page, sequential to respect rate limits) ---
+  const pages = []
+  for (const [i, result] of uniqueResults.entries()) {
+    const html = contentHtml[result.url] ?? result.rawHtml
+    const metadata = extractMetadata(result.rawHtml, result.url)
+    const rawBlocks = splitBlocks(html)
+    console.log(`  page ${i + 1}/${uniqueResults.length}: ${metadata.title} (${rawBlocks.length} blocks)`)
+    const { archetype, blocks } = await classifyBlocks(metadata.title, rawBlocks)
+    console.log(`    → ${archetype}, ${blocks.length} classified blocks`)
 
-      return {
-        url: result.finalUrl,
-        title: metadata.title,
-        archetype,
-        ...(metadata.metaDescription && { metaDescription: metadata.metaDescription }),
-        blocks,
-      }
+    pages.push({
+      url: result.finalUrl,
+      title: metadata.title,
+      archetype,
+      ...(metadata.metaDescription && { metaDescription: metadata.metaDescription }),
+      blocks,
     })
-  )
+  }
 
   const siteSchema = {
     rootUrl,

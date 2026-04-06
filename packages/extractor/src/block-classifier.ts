@@ -26,8 +26,28 @@ export const classifyBlocks = async (
 
   const prompt = classifyBlocksPrompt(pageTitle, rawBlocks)
   const raw = await callLlm(prompt)
-  const parsed = parseJsonResponse<unknown>(raw)
-  const validated = classificationResponseSchema.parse(parsed)
+
+  let parsed: unknown
+  try {
+    parsed = parseJsonResponse<unknown>(raw)
+  } catch {
+    console.warn(`  [warn] page "${pageTitle}": LLM returned invalid JSON, falling back to generic blocks`)
+    console.warn('  raw response:', raw.slice(0, 300))
+    return {
+      archetype: 'generic' as PageArchetype,
+      blocks: rawBlocks.map((b) => ({ type: 'generic_section' as const, rawHtml: b.html })),
+    }
+  }
+
+  const result = classificationResponseSchema.safeParse(parsed)
+  if (!result.success) {
+    console.warn(`  [warn] page "${pageTitle}": LLM response failed schema validation, falling back to generic blocks`)
+    return {
+      archetype: 'generic' as PageArchetype,
+      blocks: rawBlocks.map((b) => ({ type: 'generic_section' as const, rawHtml: b.html })),
+    }
+  }
+  const validated = result.data
 
   const blocks: ContentBlock[] = validated.blocks.map((rawBlock, index) => {
     const result = contentBlockSchema.safeParse(rawBlock)
