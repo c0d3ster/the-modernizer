@@ -1,6 +1,7 @@
 import { z } from 'zod'
 
 import { PageArchetype } from './page.js'
+import type { NavItem } from './site.js'
 
 // --- Block schemas ---
 
@@ -186,11 +187,7 @@ export const brandColorsSchema = z.object({
   text: z.string().optional(),
 })
 
-export const navItemSchema: z.ZodType<{
-  label: string
-  url: string
-  children?: Array<{ label: string; url: string; children?: unknown[] }>
-}> = z.object({
+export const navItemSchema: z.ZodType<NavItem> = z.object({
   label: z.string(),
   url: z.string(),
   children: z.array(z.lazy(() => navItemSchema)).optional(),

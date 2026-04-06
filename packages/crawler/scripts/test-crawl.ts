@@ -1,11 +1,16 @@
 // Quick local test script — not part of the test suite
-// Usage: pnpm --filter @modernizer/crawler crawl <url>
-// Example: pnpm --filter @modernizer/crawler crawl https://edgehillrecovery.org
+// Usage: pnpm --filter @modernizer/crawler crawl [url] [--save <path>]
+// Example: pnpm --filter @modernizer/crawler crawl https://edgehillrecovery.org --save fixtures/edgehill.json
 
 import * as cheerio from 'cheerio'
+import { writeFile, mkdir } from 'node:fs/promises'
+import { dirname } from 'node:path'
 import { crawl } from '../src/index.js'
 
-const url = process.argv[2] ?? 'https://edgehillrecovery.org'
+const args = process.argv.slice(2)
+const saveFlag = args.indexOf('--save')
+const savePath = saveFlag !== -1 ? args[saveFlag + 1] : undefined
+const url = (saveFlag !== -1 ? args.find((a, i) => !a.startsWith('--') && i !== saveFlag + 1) : args[0]) ?? 'https://edgehillrecovery.org'
 
 console.log(`Crawling: ${url}\n`)
 
@@ -28,3 +33,9 @@ for (const r of results) {
 }
 
 console.log(`Done. ${results.length} pages crawled.`)
+
+if (savePath) {
+  await mkdir(dirname(savePath), { recursive: true })
+  await writeFile(savePath, JSON.stringify(results, null, 2), 'utf-8')
+  console.log(`\nFixture saved to: ${savePath}`)
+}
