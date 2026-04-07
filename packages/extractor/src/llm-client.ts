@@ -31,16 +31,26 @@ export const resetUsageStats = (): void => {
   usage.estimatedCostUsd = 0
 }
 
-export const callLlm = async (prompt: string): Promise<string> => {
+
+export interface LlmTool {
+  name: string
+  description: string
+  input_schema: { type: 'object'; properties?: Record<string, unknown>; required?: string[]; [key: string]: unknown }
+}
+
+export const callLlmWithTool = async <T>(prompt: string, tool: LlmTool): Promise<T> => {
   const response = await getClient().messages.create({
     model: MODEL,
     max_tokens: 8192,
+    temperature: 0,
+    tools: [tool],
+    tool_choice: { type: 'tool', name: tool.name },
     messages: [{ role: 'user', content: prompt }],
   })
 
-  const block = response.content[0]
-  if (!block || block.type !== 'text') {
-    throw new Error('LLM returned no text content')
+  const block = response.content.find((b) => b.type === 'tool_use')
+  if (!block || block.type !== 'tool_use') {
+    throw new Error('LLM did not return a tool_use block')
   }
 
   const { input_tokens, output_tokens } = response.usage
@@ -51,16 +61,5 @@ export const callLlm = async (prompt: string): Promise<string> => {
     (input_tokens / 1_000_000) * COST_PER_M_INPUT +
     (output_tokens / 1_000_000) * COST_PER_M_OUTPUT
 
-  return block.text
-}
-
-export const parseJsonResponse = <T>(raw: string): T => {
-  // strip markdown fences if the model added them despite instructions
-  const cleaned = raw
-    .trim()
-    .replace(/^```(?:json)?\s*/i, '')
-    .replace(/\s*```$/, '')
-    .trim()
-
-  return JSON.parse(cleaned) as T
+  return block.input as T
 }

@@ -1,3 +1,5 @@
+import type { LlmTool } from '../llm-client.js'
+
 export const extractSitePrompt = (chromeHtml: string, rootUrl: string): string => `
 You are extracting site-level metadata from the navigation and footer HTML of a website.
 
@@ -13,30 +15,65 @@ Extract the following:
 5. footer — any contact info, address, phone, email, or social links found in the footer
 
 RULES:
-- Output ONLY valid JSON — no markdown fences, no preamble.
 - For nav URLs, always use absolute URLs.
 - If you cannot find a value, omit the field rather than guessing.
 
 CHROME HTML:
 ${chromeHtml.slice(0, 8000)}
-
-OUTPUT FORMAT (JSON only):
-{
-  "siteName": "...",
-  "tagline": "...",
-  "brandColors": {
-    "primary": "#hex",
-    "secondary": "#hex"
-  },
-  "nav": [
-    { "label": "Home", "url": "https://..." },
-    { "label": "Services", "url": "https://...", "children": [...] }
-  ],
-  "footer": {
-    "phone": "...",
-    "email": "...",
-    "address": "...",
-    "socialLinks": [{ "platform": "...", "url": "..." }]
-  }
-}
 `.trim()
+
+export const extractSiteTool: LlmTool = {
+  name: 'extract_site',
+  description: 'Extract site-level metadata (name, nav, brand colors, footer) from shared chrome HTML.',
+  input_schema: {
+    type: 'object',
+    required: ['siteName', 'nav'],
+    properties: {
+      siteName: { type: 'string' },
+      tagline: { type: 'string' },
+      brandColors: {
+        type: 'object',
+        properties: {
+          primary: { type: 'string' },
+          secondary: { type: 'string' },
+          accent: { type: 'string' },
+        },
+        additionalProperties: false,
+      },
+      nav: {
+        type: 'array',
+        items: {
+          type: 'object',
+          required: ['label', 'url'],
+          properties: {
+            label: { type: 'string' },
+            url: { type: 'string' },
+            children: { type: 'array', items: { type: 'object', additionalProperties: true } },
+          },
+          additionalProperties: false,
+        },
+      },
+      footer: {
+        type: 'object',
+        properties: {
+          phone: { type: 'string' },
+          email: { type: 'string' },
+          address: { type: 'string' },
+          socialLinks: {
+            type: 'array',
+            items: {
+              type: 'object',
+              required: ['platform', 'url'],
+              properties: {
+                platform: { type: 'string' },
+                url: { type: 'string' },
+              },
+              additionalProperties: false,
+            },
+          },
+        },
+        additionalProperties: false,
+      },
+    },
+  },
+}
