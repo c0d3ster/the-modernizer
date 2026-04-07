@@ -53,7 +53,7 @@ export const extractSiteData = async (
     siteName: validated.siteName,
     tagline: validated.tagline,
     brandColors: validated.brandColors ?? { primary: '#000000' },
-    nav: validated.nav as NavItem[],
+    nav: validated.nav,
     footerPhone: validated.footer?.phone,
     footerEmail: validated.footer?.email,
     footerAddress: validated.footer?.address,
