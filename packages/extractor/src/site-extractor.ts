@@ -2,8 +2,8 @@ import { navItemSchema, brandColorsSchema } from '@modernizer/schema'
 import type { NavItem, BrandColors } from '@modernizer/schema'
 import { z } from 'zod'
 
-import { callLlm, parseJsonResponse } from './llm-client.js'
-import { extractSitePrompt } from './prompts/extract-site.js'
+import { callLlmWithTool } from './llm-client.js'
+import { extractSitePrompt, extractSiteTool } from './prompts/extract-site.js'
 
 const socialLinkSchema = z.object({
   platform: z.string(),
@@ -40,14 +40,11 @@ export const extractSiteData = async (
   rootUrl: string
 ): Promise<SiteExtractionResult> => {
   const prompt = extractSitePrompt(chromeHtml, rootUrl)
-  const raw = await callLlm(prompt)
-  const parsed = parseJsonResponse<unknown>(raw)
+  const toolResult = await callLlmWithTool<unknown>(prompt, extractSiteTool)
 
-  const result = siteExtractionResponseSchema.safeParse(parsed)
+  const result = siteExtractionResponseSchema.safeParse(toolResult)
   if (!result.success) {
-    const preview = raw.length > 500 ? `${raw.slice(0, 500)}...` : raw
     console.error('site extraction: schema validation failed', result.error.flatten())
-    console.error('raw response (preview):', preview)
     throw result.error
   }
   const validated = result.data
@@ -56,7 +53,7 @@ export const extractSiteData = async (
     siteName: validated.siteName,
     tagline: validated.tagline,
     brandColors: validated.brandColors ?? { primary: '#000000' },
-    nav: validated.nav as NavItem[],
+    nav: validated.nav,
     footerPhone: validated.footer?.phone,
     footerEmail: validated.footer?.email,
     footerAddress: validated.footer?.address,
