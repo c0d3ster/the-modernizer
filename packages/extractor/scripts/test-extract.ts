@@ -17,6 +17,7 @@ import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { CrawlResult } from '@modernizer/schema'
 import { extract } from '../src/index.js'
+import { getUsageStats } from '../src/llm-client.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 config({ path: resolve(__dirname, '../../../.env') })
@@ -75,3 +76,10 @@ if (outPath) {
   await mkdir(dirname(outPath), { recursive: true })
   console.log(`\nSchema saved to: ${outPath}`)
 }
+
+const stats = getUsageStats()
+console.log('\n=== LLM usage ===')
+console.log(`  Calls:        ${stats.calls}`)
+console.log(`  Input tokens: ${stats.inputTokens.toLocaleString()}`)
+console.log(`  Output tokens:${stats.outputTokens.toLocaleString()}`)
+console.log(`  Est. cost:    $${stats.estimatedCostUsd.toFixed(4)}`)

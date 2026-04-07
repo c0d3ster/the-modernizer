@@ -33,7 +33,7 @@ Also classify the page archetype from this list:
 home | about | services | contact | blog | blog_post | team | pricing | faq | gallery | generic
 
 INPUT BLOCKS (${blocks.length} total):
-${JSON.stringify(blocks.map((b, i) => ({ index: i, html: b.html })), null, 2)}
+${JSON.stringify(blocks.map((b, i) => ({ index: i, html: b.html.slice(0, 3000) })), null, 2)}
 
 OUTPUT FORMAT (JSON only):
 {

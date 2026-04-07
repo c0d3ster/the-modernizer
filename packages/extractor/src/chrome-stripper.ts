@@ -10,6 +10,14 @@ const CHROME_SELECTORS = [
   '[role="navigation"]',
   '[role="banner"]',
   '[role="contentinfo"]',
+  // common WordPress IDs
+  '#header',
+  '#footer',
+  '#navbar',
+  '#navigation',
+  '#main-navigation',
+  '#site-navigation',
+  // common WordPress classes
   '.cookie-banner',
   '.cookie-notice',
   '.popup',
@@ -21,6 +29,7 @@ const CHROME_SELECTORS = [
   '.site-footer',
   '.nav-menu',
   '.wp-block-navigation',
+  '.main-navigation',
 ]
 
 const hashHtml = (html: string): string =>

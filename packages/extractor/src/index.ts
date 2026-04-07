@@ -1,6 +1,7 @@
 // Content extractor: converts raw HTML into structured page schemas
 
 export { extract } from './assembler.js'
+export { getUsageStats, resetUsageStats } from './llm-client.js'
 export { stripChrome } from './chrome-stripper.js'
 export { extractMetadata } from './metadata-extractor.js'
 export { splitBlocks } from './block-splitter.js'
