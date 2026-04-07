@@ -8,26 +8,27 @@ See `docs/implementation-plan.md` for the complete 7-phase implementation plan w
 
 ## Current Phase
 
-Working on **Phase 1: Foundation** (schema types and project scaffolding).
+Working on **Phase 4: Component Library** (shadcn/ui primitives + block components).
 
 ## Architecture
 
 Four-stage pipeline: **Crawl > Extract > Generate > Output**
 
 - `packages/schema` - Shared TypeScript types + Zod validation (the contract between all layers)
-- `packages/ui` - Component library following atomic design (atoms/molecules/organisms/templates)
+- `packages/ui` - Component library: shadcn/ui primitives + block components (1:1 with ContentBlock types)
 - `packages/crawler` - Discovers and fetches all pages on a target site
 - `packages/extractor` - Converts raw HTML into structured page schemas using deterministic parsing + LLM classification
 - `packages/generator` - Takes structured schemas and outputs a complete Next.js project
 - `apps/cli` - Command-line entry point that orchestrates the pipeline
-- `apps/preview` - Visual test harness for the component library
+- `apps/preview` - Visual test harness for block components
 
 ## Conventions
 
 - TypeScript everywhere, strict mode
-- Atomic design for components: atoms > molecules > organisms > templates
-- Components only import from layers below them (no upward or sideways imports)
+- shadcn/ui for primitives (Button, Card, Badge, etc.) — stored in `packages/ui/src/shadcn/`, copied into output projects
+- Block components in `packages/ui/src/blocks/` — one per ContentBlock type, compose shadcn primitives
 - Zod validation on all LLM outputs, never trust raw JSON
+- All LLM calls use Anthropic tool use API (`callLlmWithTool`) with `temperature: 0`
 - Vitest for testing
 - All styling via Tailwind CSS utility classes, no separate CSS files
 - Deterministic approaches first, LLM calls only for ambiguous classification/structuring
