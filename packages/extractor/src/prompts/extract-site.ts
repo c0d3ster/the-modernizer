@@ -9,7 +9,7 @@ Extract the following:
 1. siteName — the name of the business or organization
 2. tagline — a short tagline or slogan if present (optional)
 3. nav — the complete navigation tree as an array of { label, url, children? } objects. Resolve relative URLs against the root URL.
-4. brandColors — up to 3 hex color candidates from inline styles or class names (e.g. "#0070f3"). At minimum provide a primary color.
+4. brandColors — when you can identify colors from inline styles or class-related hints, up to 3 hex candidates (e.g. "#0070f3"), typically including a primary if one is clear. If no reliable colors appear in the chrome HTML, omit brandColors entirely.
 5. footer — any contact info, address, phone, email, or social links found in the footer
 
 RULES:

@@ -49,6 +49,16 @@ export const classifyBlocks = async (
   }
   const validated = result.data
 
+  if (validated.blocks.length !== rawBlocks.length) {
+    console.warn(
+      `  [warn] page "${pageTitle}": expected ${rawBlocks.length} blocks, got ${validated.blocks.length}; falling back to generic blocks`
+    )
+    return {
+      archetype: 'generic' as PageArchetype,
+      blocks: rawBlocks.map((b) => ({ type: 'generic_section' as const, rawHtml: b.html })),
+    }
+  }
+
   const blocks: ContentBlock[] = validated.blocks.map((rawBlock, index) => {
     const result = contentBlockSchema.safeParse(rawBlock)
     if (result.success) return result.data

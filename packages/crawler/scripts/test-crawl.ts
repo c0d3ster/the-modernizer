@@ -9,8 +9,23 @@ import { crawl } from '../src/index.js'
 
 const args = process.argv.slice(2)
 const saveFlag = args.indexOf('--save')
-const savePath = saveFlag !== -1 ? args[saveFlag + 1] : undefined
-const url = (saveFlag !== -1 ? args.find((a, i) => !a.startsWith('--') && i !== saveFlag + 1) : args[0]) ?? 'https://edgehillrecovery.org'
+const defaultUrl = 'https://edgehillrecovery.org'
+
+let savePath: string | undefined
+let url: string
+
+if (saveFlag !== -1) {
+  const pathAfterSave = args[saveFlag + 1]
+  if (!pathAfterSave || pathAfterSave.startsWith('--')) {
+    console.error('Error: --save requires a file path (e.g. --save fixtures/edgehill.json)')
+    process.exit(1)
+  }
+  savePath = pathAfterSave
+  url =
+    args.find((a, i) => !a.startsWith('--') && i !== saveFlag + 1) ?? defaultUrl
+} else {
+  url = args[0] ?? defaultUrl
+}
 
 console.log(`Crawling: ${url}\n`)
 

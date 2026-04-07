@@ -1,5 +1,8 @@
 import type { RawBlock } from '../block-splitter.js'
 
+/** Per-block HTML cap keeps prompts within model context; aligns with prompt rules below. */
+const MAX_BLOCK_HTML_CHARS = 12_000
+
 export const classifyBlocksPrompt = (pageTitle: string, blocks: RawBlock[]): string => `
 You are extracting structured content from a web page for a site modernization tool.
 
@@ -24,25 +27,26 @@ BLOCK TYPES AND THEIR REQUIRED FIELDS:
 - generic_section: { heading?: string, rawHtml: string }
 
 RULES:
-- Preserve all text content exactly — do not summarize, rewrite, or omit any text.
+- Each input block's HTML may be truncated for length limits. Preserve all text that appears in that block's input exactly — do not summarize, rewrite, omit visible text, or invent text that was not in the input.
 - Use generic_section as a fallback when no other type fits.
 - For body fields in text_section, preserve the full text content as a plain string (no HTML tags).
 - Output ONLY valid JSON — no markdown fences, no preamble, no explanation.
+- The "blocks" array MUST contain exactly ${blocks.length} entries, in the same order as the input (index 0 → first output block, etc.). Do not drop, merge, or reorder blocks.
 
 Also classify the page archetype from this list:
 home | about | services | contact | blog | blog_post | team | pricing | faq | gallery | generic
 
 INPUT BLOCKS (${blocks.length} total):
-${JSON.stringify(blocks.map((b, i) => ({ index: i, html: b.html.slice(0, 3000) })), null, 2)}
+${JSON.stringify(blocks.map((b, i) => ({ index: i, html: b.html.slice(0, MAX_BLOCK_HTML_CHARS) })), null, 2)}
 
 OUTPUT FORMAT (JSON only):
 {
   "archetype": "<archetype>",
   "blocks": [
-    { "type": "<block_type>", ...fields },
-    ...
+    { "type": "<block_type>", ...fields }
   ]
 }
+(Exactly ${blocks.length} objects in "blocks", order preserved.)
 
 EXAMPLES:
 Block with a large headline and a button → hero

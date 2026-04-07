@@ -58,10 +58,15 @@ const getContentRoot = ($: cheerio.CheerioAPI): ReturnType<cheerio.CheerioAPI> =
       const child = children.first()
       const tag = (child.prop('tagName') ?? '').toLowerCase()
       const id = child.attr('id') ?? ''
-      const cls = child.attr('class') ?? ''
+      const classTokens = (child.attr('class') ?? '').split(/\s+/).filter(Boolean)
+      const matchesSelector = (s: string): boolean => {
+        if (s.startsWith('#')) return s === `#${id}`
+        if (s.startsWith('.')) return classTokens.includes(s.slice(1))
+        return false
+      }
       const isWrapper =
         tag === 'div' &&
-        (WRAPPER_SELECTORS.some((s) => s === `#${id}` || s === `.${cls}`) ||
+        (WRAPPER_SELECTORS.some(matchesSelector) ||
           id.includes('wrap') || id.includes('container') || id.includes('page'))
       if (isWrapper) {
         root = child

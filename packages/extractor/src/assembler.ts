@@ -1,6 +1,7 @@
 import { siteSchemaSchema } from '@modernizer/schema'
 import type { SiteSchema } from '@modernizer/schema'
-import { writeFile } from 'node:fs/promises'
+import { mkdir, writeFile } from 'node:fs/promises'
+import { dirname } from 'node:path'
 
 import { stripChrome } from './chrome-stripper.js'
 import { extractMetadata } from './metadata-extractor.js'
@@ -24,7 +25,12 @@ export const extract = async (
     return true
   })
 
-  const rootUrl = uniqueResults[0]?.url ?? ''
+  if (uniqueResults.length === 0) {
+    throw new Error('Cannot extract: no crawl pages provided')
+  }
+
+  const first = uniqueResults[0]!
+  const rootUrl = first.finalUrl || first.url
 
   // --- deterministic passes ---
   const { contentHtml, chromeHtml } = stripChrome(
@@ -66,6 +72,7 @@ export const extract = async (
   const validated = siteSchemaSchema.parse(siteSchema)
 
   if (options.outputPath) {
+    await mkdir(dirname(options.outputPath), { recursive: true })
     await writeFile(options.outputPath, JSON.stringify(validated, null, 2), 'utf-8')
   }
 

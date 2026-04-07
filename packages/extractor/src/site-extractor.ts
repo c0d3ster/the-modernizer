@@ -45,7 +45,9 @@ export const extractSiteData = async (
 
   const result = siteExtractionResponseSchema.safeParse(parsed)
   if (!result.success) {
-    console.error('site extraction raw response:', raw)
+    const preview = raw.length > 500 ? `${raw.slice(0, 500)}...` : raw
+    console.error('site extraction: schema validation failed', result.error.flatten())
+    console.error('raw response (preview):', preview)
     throw result.error
   }
   const validated = result.data
