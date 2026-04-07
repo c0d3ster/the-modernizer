@@ -1,11 +1,31 @@
 // Quick local test script — not part of the test suite
-// Usage: pnpm --filter @modernizer/crawler crawl <url>
-// Example: pnpm --filter @modernizer/crawler crawl https://edgehillrecovery.org
+// Usage: pnpm --filter @modernizer/crawler crawl [url] [--save <path>]
+// Example: pnpm --filter @modernizer/crawler crawl https://edgehillrecovery.org --save fixtures/edgehill.json
 
 import * as cheerio from 'cheerio'
+import { writeFile, mkdir } from 'node:fs/promises'
+import { dirname } from 'node:path'
 import { crawl } from '../src/index.js'
 
-const url = process.argv[2] ?? 'https://edgehillrecovery.org'
+const args = process.argv.slice(2)
+const saveFlag = args.indexOf('--save')
+const defaultUrl = 'https://edgehillrecovery.org'
+
+let savePath: string | undefined
+let url: string
+
+if (saveFlag !== -1) {
+  const pathAfterSave = args[saveFlag + 1]
+  if (!pathAfterSave || pathAfterSave.startsWith('--')) {
+    console.error('Error: --save requires a file path (e.g. --save fixtures/edgehill.json)')
+    process.exit(1)
+  }
+  savePath = pathAfterSave
+  url =
+    args.find((a, i) => !a.startsWith('--') && i !== saveFlag + 1) ?? defaultUrl
+} else {
+  url = args[0] ?? defaultUrl
+}
 
 console.log(`Crawling: ${url}\n`)
 
@@ -28,3 +48,9 @@ for (const r of results) {
 }
 
 console.log(`Done. ${results.length} pages crawled.`)
+
+if (savePath) {
+  await mkdir(dirname(savePath), { recursive: true })
+  await writeFile(savePath, JSON.stringify(results, null, 2), 'utf-8')
+  console.log(`\nFixture saved to: ${savePath}`)
+}

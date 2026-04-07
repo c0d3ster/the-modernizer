@@ -1,6 +1,16 @@
 // Content extractor: converts raw HTML into structured page schemas
-// Implementation begins in Phase 3
 
-import type { PageSchema } from '@modernizer/schema'
-
-export type { PageSchema }
+export { extract } from './assembler.js'
+export { getUsageStats, resetUsageStats } from './llm-client.js'
+export { stripChrome } from './chrome-stripper.js'
+export { extractMetadata } from './metadata-extractor.js'
+export { splitBlocks } from './block-splitter.js'
+export { classifyBlocks } from './block-classifier.js'
+export { extractSiteData } from './site-extractor.js'
+export type { CrawlResult } from '@modernizer/schema'
+export type { RawBlock } from './block-splitter.js'
+export type { StrippedPages } from './chrome-stripper.js'
+export type { PageMetadata } from './metadata-extractor.js'
+export type { ClassificationResult } from './block-classifier.js'
+export type { SiteExtractionResult } from './site-extractor.js'
+export type { ExtractOptions } from './assembler.js'

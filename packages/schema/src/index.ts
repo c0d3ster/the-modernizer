@@ -21,6 +21,8 @@ export type { PageSchema } from './page.js'
 
 export type { NavItem, BrandColors, SiteSchema } from './site.js'
 
+export type { FetchMethod, CrawlResult, CrawlOptions } from './crawl.js'
+
 export {
   heroBlockSchema,
   textSectionBlockSchema,
