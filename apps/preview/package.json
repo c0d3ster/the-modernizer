@@ -17,10 +17,13 @@
     "@modernizer/eslint-config": "workspace:*",
     "@modernizer/typescript-config": "workspace:*",
     "@modernizer/ui": "workspace:*",
+    "@tailwindcss/postcss": "^4.2.2",
+    "@tailwindcss/typography": "^0.5.19",
     "@types/node": "^22.15.3",
     "@types/react": "19.2.2",
     "@types/react-dom": "19.2.2",
     "eslint": "^9.39.1",
+    "tailwindcss": "^4.2.2",
     "typescript": "5.9.2"
   }
 }

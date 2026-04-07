@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import './globals.css'
 
 export const metadata = {
   title: 'The Modernizer - Preview',
@@ -7,7 +8,7 @@ export const metadata = {
 
 const RootLayout = ({ children }: { children: ReactNode }) => {
   return (
-    <html lang='en'>
+    <html lang="en">
       <body>{children}</body>
     </html>
   )
