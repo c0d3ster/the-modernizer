@@ -42,8 +42,16 @@ const serializeNav = (items: Array<{ label: string; url: string }>): string => {
 }
 
 export const generateLayout = (schema: SiteSchema): string => {
-  const { siteName, nav, tagline, rootUrl } = schema
-  const flatNav = flattenNav(nav, rootUrl)
+  const { siteName, nav, tagline, rootUrl, pages } = schema
+  const pagePathnames = new Set(
+    pages.map((p) => {
+      try { return new URL(p.url).pathname.replace(/\/$/, '') || '/' } catch { return p.url }
+    })
+  )
+  const flatNav = flattenNav(nav, rootUrl).filter((item) => {
+    try { return pagePathnames.has(new URL(item.url, rootUrl).pathname.replace(/\/$/, '') || '/') }
+    catch { return true } // keep external links
+  })
   const navLiteral = serializeNav(flatNav)
   const description = tagline ?? siteName
 

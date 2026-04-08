@@ -161,7 +161,8 @@ describe('generateSite', () => {
       const layout = await read('src/app/layout.tsx')
       expect(layout).toContain("title: 'Sunrise Bakery'")
       expect(layout).toContain("label: 'About'")
-      expect(layout).toContain("label: 'Menu'")
+      expect(layout).toContain("label: 'Contact'")
+      expect(layout).not.toContain("label: 'Menu'") // no /menu page exists, should be filtered
       expect(layout).toContain("siteName='Sunrise Bakery'")
       // nav URLs should be relative, not full absolute URLs
       expect(layout).not.toContain('https://example-bakery.com')
