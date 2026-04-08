@@ -152,6 +152,7 @@ describe('generateSite', () => {
       const css = await read('src/app/globals.css')
       expect(css).toContain('--color-primary: #b45309')
       expect(css).toContain('--color-background: #fffbf5')
+      expect(css).toContain('@source "../"')
       expect(css).not.toContain('@plugin')
     })
   })
@@ -209,6 +210,32 @@ describe('generateSite', () => {
       const page = await read('src/app/page.tsx')
       const heroImports = page.match(/from '@\/components\/blocks\/HeroBlock'/g) ?? []
       expect(heroImports).toHaveLength(1)
+    })
+  })
+
+  describe('modernization report', () => {
+    it('writes MODERNIZATION_REPORT.md', async () => {
+      expect(await exists('MODERNIZATION_REPORT.md')).toBe(true)
+    })
+
+    it('report contains site name and source URL', async () => {
+      const report = await read('MODERNIZATION_REPORT.md')
+      expect(report).toContain('Sunrise Bakery')
+      expect(report).toContain('https://example-bakery.com/')
+    })
+
+    it('report lists nav items and pages', async () => {
+      const report = await read('MODERNIZATION_REPORT.md')
+      expect(report).toContain('About')
+      expect(report).toContain('Contact')
+      expect(report).toContain('src/app/page.tsx')
+      expect(report).toContain('src/app/about/page.tsx')
+    })
+
+    it('report includes brand colors', async () => {
+      const report = await read('MODERNIZATION_REPORT.md')
+      expect(report).toContain('#b45309')
+      expect(report).toContain('#fffbf5')
     })
   })
 

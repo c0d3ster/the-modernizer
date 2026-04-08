@@ -2,7 +2,7 @@ import type { SiteSchema, BrandColors, NavItem } from '@modernizer/schema'
 
 // Flattens the nav tree into a single level, strips origins from same-site
 // URLs, and skips anchor-only items (#) that have no real destination.
-const flattenNav = (nav: NavItem[], rootUrl: string): Array<{ label: string; url: string }> => {
+export const flattenNav = (nav: NavItem[], rootUrl: string): Array<{ label: string; url: string }> => {
   const origin = new URL(rootUrl).origin
 
   const toRelative = (url: string): string | null => {
@@ -48,10 +48,12 @@ export const generateLayout = (schema: SiteSchema): string => {
       try { return new URL(p.url).pathname.replace(/\/$/, '') || '/' } catch { return p.url }
     })
   )
-  const flatNav = flattenNav(nav, rootUrl).filter((item) => {
-    try { return pagePathnames.has(new URL(item.url, rootUrl).pathname.replace(/\/$/, '') || '/') }
-    catch { return true } // keep external links
-  })
+  const flatNav = flattenNav(nav, rootUrl)
+    .filter((item) => {
+      try { return pagePathnames.has(new URL(item.url, rootUrl).pathname.replace(/\/$/, '') || '/') }
+      catch { return true } // keep external links
+    })
+    .slice(0, 7)
   const navLiteral = serializeNav(flatNav)
   const description = tagline ?? siteName
 
@@ -83,12 +85,16 @@ export default RootLayout
 `
 }
 
+/** Warm neutral when the schema does not specify a page background (avoids harsh #fff). */
+const DEFAULT_PAGE_BACKGROUND = '#f4f1ec'
+
 export const generateGlobalsCss = (brandColors: BrandColors): string => {
   const primary = brandColors.primary ?? '#2563eb'
   const primaryForeground = brandColors.text ?? '#ffffff'
-  const background = brandColors.background ?? '#ffffff'
+  const background = brandColors.background ?? DEFAULT_PAGE_BACKGROUND
 
   return `@import "tailwindcss";
+@source "../";
 
 /* Accordion keyframes (Radix UI) */
 @keyframes accordion-down {
@@ -105,23 +111,23 @@ export const generateGlobalsCss = (brandColors: BrandColors): string => {
   --color-primary-foreground: ${primaryForeground};
 
   --color-background: ${background};
-  --color-foreground: #0f172a;
+  --color-foreground: #1c1917;
 
-  --color-muted: #f1f5f9;
-  --color-muted-foreground: #64748b;
+  --color-muted: #e8e5e0;
+  --color-muted-foreground: #57534e;
 
-  --color-card: #ffffff;
-  --color-card-foreground: #0f172a;
+  --color-card: #fffdfb;
+  --color-card-foreground: #1c1917;
 
-  --color-popover: #ffffff;
-  --color-popover-foreground: #0f172a;
+  --color-popover: #fffdfb;
+  --color-popover-foreground: #1c1917;
 
-  --color-border: #e2e8f0;
-  --color-input: #e2e8f0;
+  --color-border: #e0d9d0;
+  --color-input: #e0d9d0;
   --color-ring: ${primary};
 
-  --color-accent: #f1f5f9;
-  --color-accent-foreground: #0f172a;
+  --color-accent: #ece8e2;
+  --color-accent-foreground: #1c1917;
 
   --color-destructive: #ef4444;
   --color-destructive-foreground: #ffffff;

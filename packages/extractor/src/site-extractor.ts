@@ -4,6 +4,7 @@ import { z } from 'zod'
 
 import { callLlmWithTool } from './llm-client.js'
 import { extractSitePrompt, extractSiteTool } from './prompts/extract-site.js'
+import type { ColorCandidate } from './color-extractor.js'
 
 const socialLinkSchema = z.object({
   platform: z.string(),
@@ -37,9 +38,10 @@ export interface SiteExtractionResult {
 
 export const extractSiteData = async (
   chromeHtml: string,
-  rootUrl: string
+  rootUrl: string,
+  colorCandidates: ColorCandidate[] = []
 ): Promise<SiteExtractionResult> => {
-  const prompt = extractSitePrompt(chromeHtml, rootUrl)
+  const prompt = extractSitePrompt(chromeHtml, rootUrl, colorCandidates)
   const toolResult = await callLlmWithTool<unknown>(prompt, extractSiteTool)
 
   const result = siteExtractionResponseSchema.safeParse(toolResult)
@@ -52,7 +54,10 @@ export const extractSiteData = async (
   return {
     siteName: validated.siteName,
     tagline: validated.tagline,
-    brandColors: validated.brandColors ?? { primary: '#000000' },
+    brandColors: validated.brandColors ?? {
+      primary: '#2563eb',
+      background: '#f4f1ec',
+    },
     nav: validated.nav,
     footerPhone: validated.footer?.phone,
     footerEmail: validated.footer?.email,

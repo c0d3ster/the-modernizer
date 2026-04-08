@@ -1,4 +1,6 @@
+import * as cheerio from 'cheerio'
 import type { PageSchema, ContentBlock } from '@modernizer/schema'
+import type { GenericSectionBlock } from '@modernizer/schema'
 
 // Most block types follow the convention: snake_case -> PascalCaseBlock
 // These three deviate from it
@@ -44,6 +46,34 @@ const serializeValue = (value: unknown, depth = 0): string => {
   return String(value)
 }
 
+// Strips plugin/widget markup from generic_section rawHtml down to readable
+// headings and paragraphs. Removes script/style tags, shortcodes, and elements
+// that have no text content after inner HTML is discarded.
+const sanitizeGenericHtml = (rawHtml: string): string => {
+  const $ = cheerio.load(rawHtml)
+
+  // Remove scripts, styles, and WordPress shortcodes
+  $('script, style, noscript').remove()
+
+  // Extract headings and paragraphs with non-empty text
+  const parts: string[] = []
+  $('h1, h2, h3, h4, h5, h6, p').each((_, el) => {
+    const text = $(el).text().trim()
+    // Skip empty, shortcode-only, or very short noise
+    if (!text || text.startsWith('[') || text.length < 3) return
+    const tag = (el as unknown as { name: string }).name
+    parts.push(`<${tag}>${text}</${tag}>`)
+  })
+
+  return parts.join('\n')
+}
+
+const sanitizeBlock = (block: ContentBlock): ContentBlock => {
+  if (block.type !== 'generic_section') return block
+  const b = block as GenericSectionBlock
+  return { ...b, rawHtml: sanitizeGenericHtml(b.rawHtml) }
+}
+
 const blockToJsx = (block: ContentBlock): string => {
   const component = blockTypeToComponent(block.type)
   return `      <${component} block={${serializeValue(block, 2)}} />`
@@ -56,7 +86,7 @@ export const generatePage = (page: PageSchema, componentName: string): string =>
     .map((c) => `import { ${c} } from '@/components/blocks/${c}'`)
     .join('\n')
 
-  const jsx = page.blocks.map(blockToJsx).join('\n')
+  const jsx = page.blocks.map(sanitizeBlock).map(blockToJsx).join('\n')
 
   return `import type { ReactElement } from 'react'
 ${imports}

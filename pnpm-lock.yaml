@@ -203,6 +203,9 @@ importers:
       '@modernizer/ui':
         specifier: workspace:*
         version: link:../ui
+      cheerio:
+        specifier: ^1.2.0
+        version: 1.2.0
     devDependencies:
       '@modernizer/eslint-config':
         specifier: workspace:*
