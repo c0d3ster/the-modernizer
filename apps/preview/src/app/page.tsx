@@ -25,7 +25,7 @@ const nav = [
 const Page = () => {
   return (
     <>
-      <Navbar siteName="Acme Corp" nav={nav} ctaText="Get Started" ctaUrl="/contact" />
+      <Navbar siteName="Modernizer" nav={nav} ctaText="Get Started" ctaUrl="/contact" />
 
       <HeroBlock block={{
         type: 'hero',
