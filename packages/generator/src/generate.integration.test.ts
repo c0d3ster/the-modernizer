@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { generateSite } from './index.js'
-import type { SiteSchema } from '@modernizer/schema'
+import { PageArchetype, type SiteSchema } from '@modernizer/schema'
 
 // Synthetic fixture — fictional bakery site, no real client data
 const fixture: SiteSchema = {
@@ -20,7 +20,7 @@ const fixture: SiteSchema = {
     {
       url: 'https://example-bakery.com/',
       title: 'Home',
-      archetype: 'home',
+      archetype: PageArchetype.Home,
       metaDescription: 'Fresh bread and pastries baked daily.',
       blocks: [
         {
@@ -57,7 +57,7 @@ const fixture: SiteSchema = {
     {
       url: 'https://example-bakery.com/about',
       title: 'About Us',
-      archetype: 'about',
+      archetype: PageArchetype.About,
       blocks: [
         {
           type: 'text_section',
@@ -77,7 +77,7 @@ const fixture: SiteSchema = {
     {
       url: 'https://example-bakery.com/contact',
       title: 'Contact',
-      archetype: 'contact',
+      archetype: PageArchetype.Contact,
       blocks: [
         {
           type: 'contact_info',
