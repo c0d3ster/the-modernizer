@@ -126,6 +126,7 @@ describe('generateSite', () => {
       expect(pkg.name).toBe('sunrise-bakery')
       expect(pkg.dependencies).toHaveProperty('next')
       expect(pkg.devDependencies).toHaveProperty('tailwindcss')
+      expect(pkg.devDependencies).not.toHaveProperty('@tailwindcss/typography')
     })
 
     it('writes next.config.ts', async () => {
@@ -151,6 +152,7 @@ describe('generateSite', () => {
       const css = await read('src/app/globals.css')
       expect(css).toContain('--color-primary: #b45309')
       expect(css).toContain('--color-background: #fffbf5')
+      expect(css).not.toContain('@plugin')
     })
   })
 
@@ -161,6 +163,8 @@ describe('generateSite', () => {
       expect(layout).toContain("label: 'About'")
       expect(layout).toContain("label: 'Menu'")
       expect(layout).toContain("siteName='Sunrise Bakery'")
+      // nav URLs should be relative, not full absolute URLs
+      expect(layout).not.toContain('https://example-bakery.com')
     })
 
     it('imports Navbar and Footer', async () => {

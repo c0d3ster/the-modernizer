@@ -1,13 +1,50 @@
 import type { SiteSchema, BrandColors, NavItem } from '@modernizer/schema'
 
-const serializeNav = (nav: NavItem[]): string => {
-  const items = nav.map((item) => `  { label: '${item.label}', url: '${item.url}' }`).join(',\n')
-  return `[\n${items},\n]`
+// Flattens the nav tree into a single level, strips origins from same-site
+// URLs, and skips anchor-only items (#) that have no real destination.
+const flattenNav = (nav: NavItem[], rootUrl: string): Array<{ label: string; url: string }> => {
+  const origin = new URL(rootUrl).origin
+
+  const toRelative = (url: string): string | null => {
+    if (!url || url === '#') return null
+    try {
+      const parsed = new URL(url)
+      if (parsed.origin === origin) {
+        return parsed.pathname.replace(/\/$/, '') || '/'
+      }
+      return url // external link — keep as-is
+    } catch {
+      return url // already relative
+    }
+  }
+
+  const seen = new Set<string>()
+  const result: Array<{ label: string; url: string }> = []
+
+  const collect = (item: NavItem): void => {
+    const url = toRelative(item.url)
+    if (url && !seen.has(url)) {
+      seen.add(url)
+      result.push({ label: item.label, url })
+    }
+    item.children?.forEach(collect)
+  }
+
+  nav.forEach(collect)
+  return result
+}
+
+const esc = (s: string): string => s.replace(/\\/g, '\\\\').replace(/'/g, "\\'")
+
+const serializeNav = (items: Array<{ label: string; url: string }>): string => {
+  const lines = items.map((item) => `  { label: '${esc(item.label)}', url: '${esc(item.url)}' }`).join(',\n')
+  return `[\n${lines},\n]`
 }
 
 export const generateLayout = (schema: SiteSchema): string => {
-  const { siteName, nav, tagline } = schema
-  const navLiteral = serializeNav(nav)
+  const { siteName, nav, tagline, rootUrl } = schema
+  const flatNav = flattenNav(nav, rootUrl)
+  const navLiteral = serializeNav(flatNav)
   const description = tagline ?? siteName
 
   return `import type { ReactElement, ReactNode } from 'react'
@@ -44,7 +81,6 @@ export const generateGlobalsCss = (brandColors: BrandColors): string => {
   const background = brandColors.background ?? '#ffffff'
 
   return `@import "tailwindcss";
-@plugin "@tailwindcss/typography";
 
 /* Accordion keyframes (Radix UI) */
 @keyframes accordion-down {
