@@ -13,7 +13,7 @@ A CLI tool that crawls outdated websites, extracts structured content, and regen
 5. [Phase 1: Foundation](#phase-1-foundation)
 6. [Phase 2: Crawler](#phase-2-crawler)
 7. [Phase 3: Extractor](#phase-3-extractor)
-8. [Phase 4: Component Library (Atomic Design)](#phase-4-component-library-atomic-design)
+8. [Phase 4: Component Library (shadcn/ui + Block Components)](#phase-4-component-library-shadcnui--block-components)
 9. [Phase 5: Generator](#phase-5-generator)
 10. [Phase 6: CLI + Integration](#phase-6-cli--integration)
 11. [Phase 7: Polish + Edge Cases](#phase-7-polish--edge-cases)
@@ -46,7 +46,7 @@ The system is a four-stage pipeline. Each stage has a clean interface boundary s
 
 **Opinionated component library over freeform generation.** Rather than generating bespoke layouts, the system maps content into a fixed set of well-designed, responsive components. This trades layout flexibility for consistency and quality.
 
-**Atomic design methodology.** Components are organized into atoms, molecules, organisms, and templates following Brad Frost's atomic design system. This creates a clear hierarchy of composition and makes the library intuitive to extend.
+**shadcn/ui as the primitive layer.** UI primitives (Button, Card, Badge, etc.) come from shadcn/ui — copied source files, no runtime npm dependency. Block-level components that map 1:1 to ContentBlock schema types are the only components built from scratch. Generated sites own all their component code.
 
 ---
 
@@ -71,21 +71,21 @@ The system is a four-stage pipeline. Each stage has a clean interface boundary s
 
 ## 3. Component Library Strategy
 
-### Why custom over Material UI
+### Why shadcn/ui
 
-The Modernizer generates sites that should look custom and modern, not like a Material Design application. Material UI carries a recognizable aesthetic that is wrong for brochure sites. It also brings significant bundle size (80-150KB gzipped for a typical setup) that is unjustifiable for what are essentially static marketing pages. More importantly, MUI's theming system would fight against the dynamic brand color extraction; the tool needs to generate a custom Tailwind color scale per site, and MUI's theme provider model does not align well with that pattern.
+shadcn/ui is not an npm package — it is a CLI that copies component source files directly into a project. The generated output has zero runtime dependency on an external library; every component is a plain React + Tailwind file owned by the output project. This is exactly the model The Modernizer needs.
 
-The better mental model is shadcn/ui: unstyled or lightly styled primitives built on Tailwind that you own entirely. You can use shadcn components as a starting point for atoms, then build up from there. The generated output has zero runtime dependency on an external component library; every component is a plain React file in the output project.
+Primitives (Button, Card, Badge, Accordion, Avatar, etc.) come from shadcn and are stored in `packages/ui/src/shadcn/`. Block-level components that map to ContentBlock types are the only components we build from scratch. This eliminates the need to build atoms and molecules by hand while still producing custom, modern-looking output.
 
 ### Where the component library lives
 
-For v1, the component library lives inside the monorepo as a package (packages/ui). This keeps iteration speed high while the designs are still stabilizing. The generator references the component templates directly from this package when assembling output projects.
+The component library lives inside the monorepo as `packages/ui`. The generator reads component source files from this package and copies them into output projects — shadcn primitives and block components alike. Output projects are fully self-contained.
 
 ### When to extract: the readiness signals
 
 Extracting too early adds friction (cross-repo PRs, version management, publish cycles) when you are still figuring out what the components need to look like. Extracting too late means the ui package accumulates hidden coupling with the rest of the monorepo. The right time is when the following signals converge:
 
-- **Component APIs are stable.** You have run 10-20 real sites through the tool and the prop interfaces for atoms, molecules, and organisms have stopped changing significantly. A good heuristic: if the last 5 sites required zero changes to existing component props (only new content/data), the APIs are stable.
+- **Component APIs are stable.** You have run 10-20 real sites through the tool and the prop interfaces for shadcn primitives and block components have stopped changing significantly. A good heuristic: if the last 5 sites required zero changes to existing component props (only new content/data), the APIs are stable.
 - **You want to use the components elsewhere.** The moment you find yourself copying component files into another project or thinking "I wish I could npm install this," it is time.
 - **The preview app feels like documentation.** When apps/preview is comprehensive enough that someone unfamiliar with the project could browse it and understand every component, the library is mature enough to stand alone.
 - **Generator coupling is minimal.** The generator should only interact with the ui package through two interfaces: reading component source files to copy into output projects, and importing TypeScript types. If you find the generator reaching into ui internals or ui importing from the generator/extractor/crawler, fix that coupling before extracting.
@@ -110,10 +110,9 @@ The package.json exports map should look like:
 {
   "exports": {
     ".": "./dist/index.js",
-    "./atoms": "./dist/atoms/index.js",
-    "./molecules": "./dist/molecules/index.js",
-    "./organisms": "./dist/organisms/index.js",
-    "./templates": "./dist/templates/index.js",
+    "./shadcn": "./dist/shadcn/index.js",
+    "./blocks": "./dist/blocks/index.js",
+    "./layout": "./dist/layout/index.js",
     "./styles": "./dist/styles/index.js"
   }
 }
@@ -158,17 +157,14 @@ After extraction, you have two repositories:
 ```
 modernizer-ui/                    # Standalone component library repo
   src/
-    atoms/
-    molecules/
-    organisms/
-    templates/
-    styles/
+    shadcn/                       # shadcn/ui primitives (Button, Card, Badge, etc.)
+    blocks/                       # Block components — 1:1 with ContentBlock types
+    layout/                       # Navbar, Footer
+    styles/                       # tokens.ts, tailwind-preset.ts
     index.ts
   preview/                        # Migrated from apps/preview
     app/
-      page.tsx
-      atoms/page.tsx
-      molecules/page.tsx
+      page.tsx                    # All blocks rendered with sample data
   package.json                    # Publishable: @modernizer/ui
   tsup.config.ts                  # Library build config
   .changeset/                     # Version management
@@ -184,18 +180,16 @@ the-modernizer/                   # CLI tool monorepo (slimmer now)
     web/
 ```
 
-### Atomic design structure
+### Component library structure
 
-The component library follows atomic design methodology. This creates a natural composition hierarchy where complex page sections are built from simpler, reusable pieces.
+| Layer      | What Lives Here                                                                      | Examples                                                                               |
+| ---------- | ------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------- |
+| `shadcn/`  | UI primitives sourced from shadcn/ui. Owned by the output project, no runtime dep.  | Button, Card, Badge, Separator, Avatar, Accordion                                      |
+| `blocks/`  | Block components built from scratch. Each maps 1:1 to a ContentBlock schema type.   | HeroBlock, FeatureGridBlock, CTABlock, FAQBlock, TeamGridBlock, PricingTableBlock, ... |
+| `layout/`  | Site-level chrome. Copied into every generated project.                              | Navbar, Footer                                                                         |
+| `styles/`  | Design token constants and Tailwind preset wiring brand color to `--color-primary`.  | tokens.ts, tailwind-preset.ts                                                          |
 
-| Layer     | What Lives Here                                                                               | Examples                                                                                                                                   |
-| --------- | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| Atoms     | Smallest UI primitives. Single-purpose, no business logic.                                    | Button, Badge, Heading, Text, Icon, Image, Input, Link, Divider                                                                            |
-| Molecules | Small groups of atoms functioning as a unit.                                                  | FeatureCard, TestimonialCard, TeamMemberCard, StatItem, PricingTier, NavLink, SearchBar, ContactDetail                                     |
-| Organisms | Complex UI sections composed of molecules and atoms. These map 1:1 to ContentBlock types.     | Hero, FeatureGrid, TestimonialSection, TeamGrid, FAQ, CTABanner, ContactInfo, PricingTable, Stats, ImageGallery, LogoCloud, Footer, Navbar |
-| Templates | Page-level layout skeletons that define block ordering and structural wrapping per archetype. | HomepageTemplate, AboutTemplate, ServicesTemplate, ContactTemplate, GenericTemplate                                                        |
-
-The key mapping: ContentBlock types from the schema map to organisms. Each organism is composed of molecules and atoms. The generator assembles organisms into templates based on the page archetype. This means adding a new content block type requires building one new organism (possibly with new molecules/atoms), but the template and generator layers rarely need to change.
+The key mapping: ContentBlock schema types map directly to block components. The generator has one job — look up the block type, instantiate the matching component with the block's data as props. Adding a new content block type means adding one schema type and one block component.
 
 ---
 
@@ -211,63 +205,40 @@ the-modernizer/
         page.ts                # PageSchema, PageArchetype
         site.ts                # SiteSchema, NavItem, BrandColors
         validation.ts          # Zod schemas mirroring the TS types
-    ui/                        # Component library (atomic design)
+    ui/                        # Component library
       src/
-        atoms/
-          Button.tsx
-          Badge.tsx
-          Heading.tsx
-          Text.tsx
-          Icon.tsx
-          Image.tsx
-          Link.tsx
-          Divider.tsx
-          Input.tsx
-          Container.tsx        # Max-width wrapper with responsive padding
-          Section.tsx          # Vertical section with consistent py spacing
+        shadcn/                # shadcn/ui primitive components (copied into output projects)
+          button.tsx
+          card.tsx
+          badge.tsx
+          separator.tsx
+          avatar.tsx
+          accordion.tsx
           index.ts
-        molecules/
-          FeatureCard.tsx
-          TestimonialCard.tsx
-          TeamMemberCard.tsx
-          StatItem.tsx
-          PricingTier.tsx
-          NavLink.tsx
-          NavDropdown.tsx
-          ContactDetail.tsx    # Single contact line (phone, email, address)
-          FAQItem.tsx          # Single accordion item (client component)
-          GalleryImage.tsx
-          LogoItem.tsx
+        blocks/                # Block components — 1:1 with ContentBlock types
+          HeroBlock.tsx
+          TextSectionBlock.tsx
+          FeatureGridBlock.tsx
+          CTABlock.tsx
+          ContactInfoBlock.tsx
+          TestimonialBlock.tsx
+          TeamGridBlock.tsx
+          FAQBlock.tsx
+          StatsBlock.tsx
+          ImageGalleryBlock.tsx
+          PricingTableBlock.tsx
+          LogoCloudBlock.tsx
+          EmbedBlock.tsx
+          GenericSection.tsx
           index.ts
-        organisms/
-          Hero.tsx             # Maps to HeroBlock
-          TextSection.tsx      # Maps to TextSectionBlock
-          FeatureGrid.tsx      # Maps to FeatureGridBlock
-          Testimonials.tsx     # Maps to TestimonialBlock
-          TeamGrid.tsx         # Maps to TeamGridBlock
-          CTABanner.tsx        # Maps to CTABlock
-          ContactInfo.tsx      # Maps to ContactInfoBlock
-          FAQ.tsx              # Maps to FAQBlock (client component)
-          Stats.tsx            # Maps to StatsBlock
-          ImageGallery.tsx     # Maps to ImageGalleryBlock
-          PricingTable.tsx     # Maps to PricingTableBlock
-          LogoCloud.tsx        # Maps to LogoCloudBlock
-          Embed.tsx            # Maps to EmbedBlock
-          GenericSection.tsx   # Maps to GenericSectionBlock (fallback)
-          Navbar.tsx           # Site navigation (client component)
-          Footer.tsx           # Site footer
-          index.ts
-        templates/
-          HomepageTemplate.tsx
-          AboutTemplate.tsx
-          ServicesTemplate.tsx
-          ContactTemplate.tsx
-          GenericTemplate.tsx
+        layout/                # Site-level layout components
+          Navbar.tsx
+          Footer.tsx
           index.ts
         styles/
           tokens.ts            # Spacing scale, type scale, color helpers
-          tailwind-preset.ts   # Shared Tailwind config preset
-        index.ts               # Re-exports all layers
+          tailwind-preset.ts   # Tailwind preset — maps `primary` to CSS var
+        index.ts               # Re-exports blocks + layout
     crawler/
       src/
         index.ts               # Main crawl() entry point
@@ -442,94 +413,64 @@ Unit tests for chrome stripping (mock multi-page HTML with shared elements), blo
 
 ---
 
-## Phase 4: Component Library (Atomic Design)
+## Phase 4: Component Library (shadcn/ui + Block Components)
 
-_The React components that render each content block type. Organized in atomic design layers: atoms, molecules, organisms, templates._
+_The React components that render each content block type. Primitive UI is sourced from shadcn/ui; block-level components specific to this tool are built on top._
 
-### Step 4.1: Component architecture decisions
+### Approach: shadcn as the primitive layer
 
-All components are React Server Components (no "use client" directive) unless they require interactivity (mobile nav toggle, FAQ accordion, image gallery lightbox). Each organism accepts its corresponding block type as props. All styling is Tailwind utility classes, no separate CSS files. Components are copied into the generated output project by the generator, so they must be self-contained with no imports outside the ui package.
+shadcn/ui is not an npm package — it is a CLI that copies component source files directly into a project. Generated sites own the code with no runtime dependency on an external library. This is exactly the model The Modernizer needs: the generator copies pre-built, well-designed component files into the output project.
 
-The ui package lives at packages/ui and exports all layers. Components at each layer only import from layers below them: molecules import atoms, organisms import molecules and atoms, templates import organisms. No upward or sideways imports. This enforces a clean composition hierarchy.
+This eliminates the need to build atoms and molecules from scratch. Instead:
 
-### Step 4.2: Build atoms
+- **shadcn components** (Button, Card, Badge, Separator, Avatar, etc.) are stored in `packages/ui/src/shadcn/` as the primitive layer. The generator copies the relevant ones into each output project.
+- **Block components** (`packages/ui/src/blocks/`) map 1:1 to ContentBlock schema types. These are the only components we build. They compose shadcn primitives with Tailwind layout.
+- **Layout components** (`packages/ui/src/layout/`) — Navbar and Footer — are built once and copied into every output project.
 
-Atoms are the smallest primitives. They wrap native HTML elements with consistent styling and accept standard props. Build these first since everything else composes from them.
+### Step 4.1: Initialize packages/ui with shadcn
 
-| Atom      | Wraps                    | Key Props                                                             |
-| --------- | ------------------------ | --------------------------------------------------------------------- |
-| Button    | `<button>` / `<a>`       | variant (primary/secondary/ghost), size (sm/md/lg), href?, children   |
-| Badge     | `<span>`                 | variant (default/success/warning), children                           |
-| Heading   | `<h1>`-`<h6>`            | level (1-6), children; auto-maps to Tailwind type scale               |
-| Text      | `<p>`                    | size (sm/base/lg), muted?, children                                   |
-| Icon      | `<svg>`                  | name (from a small built-in icon set), size                           |
-| Image     | Next.js `<Image>`        | src, alt, aspectRatio?, fill?, priority?                              |
-| Link      | `<a>` / Next `<Link>`    | href, external?, children                                             |
-| Divider   | `<hr>`                   | spacing (sm/md/lg)                                                    |
-| Input     | `<input>` / `<textarea>` | type, label?, placeholder?                                            |
-| Container | `<div>`                  | Max-width wrapper: max-w-6xl mx-auto px-4 sm:px-6 lg:px-8             |
-| Section   | `<section>`              | Vertical padding wrapper: py-16 lg:py-24, optional background variant |
+Set up `packages/ui` as a Next.js-compatible package. Run `shadcn init` to pull in the base configuration (CSS variables, `cn()` utility, `components.json`). Add the shadcn components needed by block components: `button`, `card`, `badge`, `separator`, `avatar`, `accordion`. Store them under `packages/ui/src/shadcn/`. These are the source-of-truth files the generator will copy into output projects.
 
-### Step 4.3: Build molecules
+### Step 4.2: Design token system (brand color integration)
 
-Molecules combine atoms into small functional units. Each molecule is a self-contained piece of UI that appears inside an organism.
+Generated sites must look "on brand" from the first run. Wire this in from day one:
 
-| Molecule        | Composed From                   | Notes                                                                                 |
-| --------------- | ------------------------------- | ------------------------------------------------------------------------------------- |
-| FeatureCard     | Icon + Heading + Text           | Card with optional icon, title, description. Subtle border, rounded corners.          |
-| TestimonialCard | Text + Text                     | Quote in serif italic + author name/role. Card variant.                               |
-| TeamMemberCard  | Image + Heading + Text          | Photo (or placeholder avatar) + name + role + optional bio.                           |
-| StatItem        | Heading + Text                  | Large number + label + optional description.                                          |
-| PricingTier     | Heading + Text + Badge + Button | Tier name, price, feature list, CTA button. Highlighted variant for recommended tier. |
-| NavLink         | Link                            | Single nav item with active state styling.                                            |
-| NavDropdown     | NavLink + Link[]                | Dropdown trigger with child links. Handles hover/click open.                          |
-| ContactDetail   | Icon + Text                     | Single contact line: icon (phone/email/map pin) + value.                              |
-| FAQItem         | Heading + Text                  | Accordion item with expand/collapse (client component). Accessible aria attributes.   |
-| GalleryImage    | Image                           | Image with lazy loading, aspect ratio container, optional caption.                    |
-| LogoItem        | Image + Link                    | Logo with grayscale filter, color on hover, optional link.                            |
+- `packages/ui/src/styles/tokens.ts` — spacing scale, typography scale (h1–h4 + body sizes), section padding constants
+- `packages/ui/src/styles/tailwind-preset.ts` — Tailwind preset that maps `primary` to `var(--color-primary)`. Every block component uses `bg-primary`, `text-primary` etc.
+- The generator writes `globals.css` with `--color-primary: <extracted hex>` from the site schema's `brandColors.primary`
 
-### Step 4.4: Build organisms
+This means brand color fidelity is free — the extractor already pulls it from the chrome HTML.
 
-Organisms are the complex UI sections that map 1:1 to ContentBlock types from the schema. Each organism accepts its block type as props and composes molecules and atoms into a complete section. Build them in this priority order:
+### Step 4.3: Build block components
 
-| Priority | Organism       | Molecules Used               | Notes                                                                                              |
-| -------- | -------------- | ---------------------------- | -------------------------------------------------------------------------------------------------- |
-| 1        | Hero           | Button                       | 3 variants: image bg, solid color bg, split layout. Mobile: stack vertically, reduce heading size. |
-| 2        | TextSection    | (atoms only)                 | Heading + body. Body is markdown, render with prose formatting. max-w-3xl container.               |
-| 3        | FeatureGrid    | FeatureCard                  | Responsive grid: 3 cols desktop, 2 tablet, 1 mobile.                                               |
-| 4        | CTABanner      | Button                       | Full-width, brand color bg, heading + description + buttons.                                       |
-| 5        | ContactInfo    | ContactDetail                | Card layout with address, phone, email, hours. Optional map embed.                                 |
-| 6        | Testimonials   | TestimonialCard              | 2 cols desktop, 1 mobile. Optional carousel for >4 testimonials.                                   |
-| 7        | TeamGrid       | TeamMemberCard               | 3-4 cols desktop, 2 tablet, 1 mobile.                                                              |
-| 8        | FAQ            | FAQItem                      | Accordion list. Client component (useState for open/close state).                                  |
-| 9        | Stats          | StatItem                     | Horizontal desktop, 2x2 grid mobile.                                                               |
-| 10       | ImageGallery   | GalleryImage                 | Responsive grid. Optional lightbox (client component).                                             |
-| 11       | PricingTable   | PricingTier                  | Side-by-side tiers, highlighted recommended. Stack on mobile.                                      |
-| 12       | LogoCloud      | LogoItem                     | Horizontal row, wrapping. Centered layout.                                                         |
-| 13       | Embed          | (atoms only)                 | Responsive iframe wrapper with aspect-ratio container. Sanitize HTML.                              |
-| 14       | GenericSection | (atoms only)                 | Fallback: heading + sanitized HTML in prose container.                                             |
-| 15       | Navbar         | NavLink, NavDropdown, Button | Responsive nav. Client component (mobile toggle). Logo left, CTA right.                            |
-| 16       | Footer         | Link, ContactDetail          | Multi-column desktop, stacked mobile. Nav links + contact + legal.                                 |
+Block components are the only components we write from scratch. Each accepts its corresponding ContentBlock type as props and renders a complete page section. All styling via Tailwind. RSC by default; `"use client"` only where interactivity is required.
 
-### Step 4.5: Build templates
+Build in this priority order:
 
-Templates define page-level layout structure per archetype. They do not contain content; they define which organisms appear in what order and how they are wrapped. The generator fills templates with organisms based on the page schema's block array.
+| Priority | Component         | Block Type          | Notes                                                          |
+| -------- | ----------------- | ------------------- | -------------------------------------------------------------- |
+| 1        | HeroBlock         | HeroBlock           | Heading + subheading + CTA button. Full-width, brand color bg. |
+| 2        | TextSectionBlock  | TextSectionBlock    | Heading + prose body. max-w-3xl, @tailwindcss/typography.      |
+| 3        | FeaturGridBlock   | FeatureGridBlock    | Responsive 3-col grid of shadcn Cards.                         |
+| 4        | CTABlock          | CTABlock            | Full-width band, brand color bg, heading + button.             |
+| 5        | ContactInfoBlock  | ContactInfoBlock    | Address/phone/email with icons. Optional map embed.            |
+| 6        | TestimonialBlock  | TestimonialBlock    | Grid of shadcn Cards with quote + author.                      |
+| 7        | TeamGridBlock     | TeamGridBlock       | Avatar + name + role grid. shadcn Avatar for photo/fallback.   |
+| 8        | FAQBlock          | FAQBlock            | shadcn Accordion. `"use client"`.                              |
+| 9        | StatsBlock        | StatsBlock          | Large number + label grid. 4-col desktop, 2-col mobile.        |
+| 10       | ImageGalleryBlock | ImageGalleryBlock   | Responsive grid with Next.js Image.                            |
+| 11       | PricingTableBlock | PricingTableBlock   | shadcn Cards per tier. Highlighted recommended tier.           |
+| 12       | LogoCloudBlock    | LogoCloudBlock      | Grayscale logos, color on hover.                               |
+| 13       | EmbedBlock        | EmbedBlock          | Responsive iframe wrapper. Sanitize embedHtml.                 |
+| 14       | GenericSection    | GenericSectionBlock | Fallback: heading + sanitized HTML in prose container.         |
+| 15       | Navbar            | (site-level)        | Responsive nav. `"use client"` for mobile toggle.              |
+| 16       | Footer            | (site-level)        | Multi-column links + contact info. RSC.                        |
 
-| Template         | Typical Block Order                             | Layout Notes                                     |
-| ---------------- | ----------------------------------------------- | ------------------------------------------------ |
-| HomepageTemplate | Hero > FeatureGrid > Testimonials > CTA > Stats | Hero is full-bleed. Other sections alternate bg. |
-| AboutTemplate    | TextSection > TeamGrid > Testimonials           | Constrained-width header. Prose-focused layout.  |
-| ServicesTemplate | Hero (small) > TextSection > FeatureGrid > CTA  | Service details with supporting features.        |
-| ContactTemplate  | TextSection > ContactInfo > Embed (map)         | Contact-focused with prominent phone/address.    |
-| GenericTemplate  | blocks rendered in schema order                 | No archetype-specific wrapping. Safe fallback.   |
+### Step 4.4: Preview app (visual test harness)
 
-### Step 4.6: Design tokens and shared styles
+`apps/preview` is a Next.js app that renders every block component with sample data (sourced from Edgehill fixture schema). Each block component gets a dedicated route. This lets you visually verify every component before the generator exists and catches regressions when components change.
 
-Define a consistent design token system in packages/ui/src/styles/tokens.ts. This includes: spacing scale (section padding: py-16 lg:py-24; container: max-w-6xl mx-auto px-4 sm:px-6 lg:px-8), typography scale (h1 text-4xl lg:text-5xl, h2 text-3xl lg:text-4xl, h3 text-xl lg:text-2xl, body text-base lg:text-lg), and color utility helpers (functions to generate a full 50-900 color scale from a single brand hex value). Also create a Tailwind preset at packages/ui/src/styles/tailwind-preset.ts that generated projects extend, ensuring consistent base styles.
-
-### Step 4.7: Preview app (visual test harness)
-
-Build a standalone Next.js app at apps/preview that imports and renders every component with sample data. Organized by atomic layer: /atoms shows all atoms, /molecules shows all molecules, and the root page renders full organisms assembled into page-like layouts using Edgehill fixture data. This lets you visually verify every component before the generator exists and serves as living documentation for the component library.
+Route structure: `/` renders all blocks stacked as a full page. `/blocks/[type]` renders a single block in isolation.
 
 ---
 
@@ -704,50 +645,14 @@ Linear implementation order. Each task depends on the ones above it within its p
 - [ ] **3.7:** Assemble full SiteSchema output with validation `[Medium]`
 - [ ] **3.8:** Write extractor tests (unit + integration with HTML fixtures) `[Medium]`
 
-### Phase 4: Component Library - Atoms (can start after 1.2)
+### Phase 4: Component Library (can start after 1.2)
 
-- [ ] **4.1:** Set up packages/ui structure with atomic design folders and exports `[Small]`
-- [ ] **4.2a:** Build Button atom (primary/secondary/ghost variants, link mode) `[Small]`
-- [ ] **4.2b:** Build Heading atom (levels 1-6, auto Tailwind type scale) `[Small]`
-- [ ] **4.2c:** Build Text atom (size variants, muted option) `[Small]`
-- [ ] **4.2d:** Build Image atom (Next.js Image wrapper, aspect ratio, placeholder) `[Small]`
-- [ ] **4.2e:** Build Icon atom (small built-in SVG icon set) `[Medium]`
-- [ ] **4.2f:** Build Link, Badge, Divider, Input atoms `[Small]`
-- [ ] **4.2g:** Build Container and Section layout atoms `[Small]`
-
-### Phase 4: Component Library - Molecules
-
-- [ ] **4.3a:** Build FeatureCard molecule (Icon + Heading + Text) `[Small]`
-- [ ] **4.3b:** Build TestimonialCard molecule (quote + author) `[Small]`
-- [ ] **4.3c:** Build TeamMemberCard molecule (photo + name + role + bio) `[Medium]`
-- [ ] **4.3d:** Build StatItem molecule (large number + label) `[Small]`
-- [ ] **4.3e:** Build PricingTier molecule (name + price + features + CTA) `[Medium]`
-- [ ] **4.3f:** Build NavLink and NavDropdown molecules `[Medium]`
-- [ ] **4.3g:** Build ContactDetail, FAQItem, GalleryImage, LogoItem molecules `[Medium]`
-
-### Phase 4: Component Library - Organisms
-
-- [ ] **4.4a:** Build Hero organism (3 variants: image bg, solid bg, split) `[Medium]`
-- [ ] **4.4b:** Build TextSection organism `[Small]`
-- [ ] **4.4c:** Build FeatureGrid organism `[Medium]`
-- [ ] **4.4d:** Build CTABanner organism `[Small]`
-- [ ] **4.4e:** Build ContactInfo organism `[Small]`
-- [ ] **4.4f:** Build Testimonials organism `[Medium]`
-- [ ] **4.4g:** Build TeamGrid organism `[Medium]`
-- [ ] **4.4h:** Build FAQ organism (client component with accordion state) `[Medium]`
-- [ ] **4.4i:** Build Stats organism `[Small]`
-- [ ] **4.4j:** Build ImageGallery organism `[Medium]`
-- [ ] **4.4k:** Build PricingTable organism `[Medium]`
-- [ ] **4.4l:** Build LogoCloud, Embed, GenericSection organisms `[Medium]`
-- [ ] **4.4m:** Build Navbar organism (client component, mobile hamburger) `[Large]`
-- [ ] **4.4n:** Build Footer organism `[Medium]`
-
-### Phase 4: Component Library - Templates + Infra
-
-- [ ] **4.5a:** Build HomepageTemplate `[Medium]`
-- [ ] **4.5b:** Build AboutTemplate, ServicesTemplate, ContactTemplate, GenericTemplate `[Medium]`
-- [ ] **4.6:** Define design tokens and Tailwind preset in packages/ui/src/styles/ `[Medium]`
-- [ ] **4.7:** Build preview app (apps/preview) with sample data for all layers `[Medium]`
+- [x] **4.1:** Set up packages/ui with shadcn/, blocks/, layout/, styles/ structure and exports `[Small]`
+- [x] **4.2:** Copy shadcn primitives: Button, Card, Badge, Separator, Avatar, Accordion `[Small]`
+- [x] **4.3:** Build design token system — tokens.ts (layout constants) + tailwind-preset.ts (brand color wiring) `[Small]`
+- [x] **4.4:** Build all 14 block components (HeroBlock through GenericSection) `[Large]`
+- [x] **4.5:** Build Navbar (mobile toggle, `use client`) and Footer layout components `[Medium]`
+- [x] **4.6:** Wire up preview app (apps/preview) with Tailwind v4, all tokens, and sample data for every block `[Medium]`
 
 ### Phase 5: Generator (after Phase 3 + 4)
 
@@ -793,9 +698,9 @@ Linear implementation order. Each task depends on the ones above it within its p
 This document is designed to be handed to a Claude Code instance working in the project repository. Here are specific instructions for that handoff:
 
 - Start with Phase 1 in full before moving to any other phase. The schema types are the foundation everything else depends on.
-- Phase 4 (Component Library) can start as soon as Step 1.2 is complete. It does not depend on the crawler or extractor. Build atoms first, then molecules, then organisms, then templates.
-- The ui package at packages/ui is where all React components live. It follows atomic design: atoms/ molecules/ organisms/ templates/. Components only import from layers below them.
-- The preview app at apps/preview is the visual test harness. It should render every component at every atomic layer with sample data. Use this to verify designs before the generator exists.
+- Phase 4 (Component Library) can start as soon as Step 1.2 is complete. It does not depend on the crawler or extractor.
+- The ui package at packages/ui is where all React components live. Structure: shadcn/ (primitives), blocks/ (one component per ContentBlock type), layout/ (Navbar + Footer), styles/ (tokens + Tailwind preset). Block components only import from shadcn/ and styles/ — no cross-block imports.
+- The preview app at apps/preview is the visual test harness. It renders every block component with sample data in one scrollable page. Use this to verify designs before the generator exists.
 - For LLM prompts (Steps 3.4, 3.5, 3.6, 7.2): store prompts as template literal functions in dedicated files. This makes them easy to iterate on independently.
 - Use the Edgehill Recovery site (https://edgehillrecovery.org/) as the primary test fixture. Save its crawled HTML locally for repeatable integration tests.
 - The generator copies components from packages/ui into the output project (not importing from an npm package). The component-writer.ts file handles this. Generated code should be readable and editable by a human after generation.
