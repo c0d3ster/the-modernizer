@@ -1,6 +1,50 @@
-// Site generator: takes structured schemas and outputs a Next.js project
-// Implementation begins in Phase 5
-
+import { mkdir, writeFile } from 'node:fs/promises'
+import { join, dirname } from 'node:path'
 import type { SiteSchema } from '@modernizer/schema'
+import { urlToRoutePath, urlToComponentName } from './route-mapper.js'
+import { copyComponents } from './component-copier.js'
+import { generatePage } from './page-generator.js'
+import { generateLayout, generateGlobalsCss } from './layout-generator.js'
+import {
+  generatePackageJson,
+  generateNextConfig,
+  generateTsConfig,
+  generatePostcss,
+  generatePrettier,
+  generateEslint,
+} from './config-generator.js'
+
+export const generateSite = async (schema: SiteSchema, outputDir: string): Promise<void> => {
+  // 1. Copy component library (shadcn primitives, blocks, layout, lib, styles, schema types)
+  await copyComponents(outputDir)
+
+  // 2. Config files at project root
+  await Promise.all([
+    writeFile(join(outputDir, 'package.json'), generatePackageJson(schema)),
+    writeFile(join(outputDir, 'next.config.ts'), generateNextConfig()),
+    writeFile(join(outputDir, 'tsconfig.json'), generateTsConfig()),
+    writeFile(join(outputDir, 'postcss.config.mjs'), generatePostcss()),
+    writeFile(join(outputDir, 'prettier.config.mjs'), generatePrettier()),
+    writeFile(join(outputDir, 'eslint.config.mjs'), generateEslint()),
+  ])
+
+  // 3. App directory: layout + global styles
+  await mkdir(join(outputDir, 'src/app'), { recursive: true })
+  await Promise.all([
+    writeFile(join(outputDir, 'src/app/globals.css'), generateGlobalsCss(schema.brandColors)),
+    writeFile(join(outputDir, 'src/app/layout.tsx'), generateLayout(schema)),
+  ])
+
+  // 4. One page file per PageSchema
+  await Promise.all(
+    schema.pages.map(async (page) => {
+      const routePath = urlToRoutePath(page.url)
+      const componentName = urlToComponentName(page.url)
+      const pageDir = join(outputDir, dirname(routePath))
+      await mkdir(pageDir, { recursive: true })
+      await writeFile(join(outputDir, routePath), generatePage(page, componentName))
+    })
+  )
+}
 
 export type { SiteSchema }
