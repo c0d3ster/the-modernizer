@@ -2,6 +2,10 @@
 
 A CLI tool that crawls outdated websites, extracts structured content, and regenerates them as modern, responsive Next.js + Tailwind CSS applications.
 
+## Philosophy
+
+The goal is **not** to recreate a legacy site pixel-for-pixel. Old layouts are treated as something to **extract from**, not a visual spec to match. The pipeline preserves **information and structure** (what the site says, how pages and navigation are organized) and **re-presents** that content in a consistent design system: typography, spacing, responsive layout, and shared components. When the old presentation is cluttered or dated, the output intentionally **does not** carry it forward.
+
 ## How it works
 
 Four-stage pipeline:

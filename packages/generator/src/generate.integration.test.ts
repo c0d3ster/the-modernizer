@@ -11,6 +11,11 @@ const fixture: SiteSchema = {
   siteName: 'Sunrise Bakery',
   tagline: 'Fresh from the oven, every morning.',
   brandColors: { primary: '#b45309', background: '#fffbf5', text: '#ffffff' },
+  footer: {
+    phone: '+1 (555) 012-3456',
+    email: 'hello@example-bakery.com',
+    address: '42 Maple Street, Brookfield, MA 01506',
+  },
   nav: [
     { label: 'About', url: '/about' },
     { label: 'Menu', url: '/menu' },
@@ -165,6 +170,9 @@ describe('generateSite', () => {
       expect(layout).toContain("label: 'Contact'")
       expect(layout).not.toContain("label: 'Menu'") // no /menu page exists, should be filtered
       expect(layout).toContain("siteName='Sunrise Bakery'")
+      expect(layout).toContain('phone={"+1 (555) 012-3456"}')
+      expect(layout).toContain('hello@example-bakery.com')
+      expect(layout).toContain('42 Maple Street')
       // nav URLs should be relative, not full absolute URLs
       expect(layout).not.toContain('https://example-bakery.com')
     })
@@ -222,6 +230,7 @@ describe('generateSite', () => {
       const report = await read('MODERNIZATION_REPORT.md')
       expect(report).toContain('Sunrise Bakery')
       expect(report).toContain('https://example-bakery.com/')
+      expect(report).toContain('## Philosophy')
     })
 
     it('report lists nav items and pages', async () => {

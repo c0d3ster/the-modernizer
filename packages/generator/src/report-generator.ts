@@ -61,6 +61,10 @@ export const generateReport = (
 
 Generated: ${generatedAt}
 
+## Philosophy
+
+This run does **not** aim for a pixel-perfect copy of the source site. Legacy markup is input for extraction, not a design target to reproduce. The intent is to keep **information and site structure** (content, messaging, navigation, sections) while **resetting presentation**: a shared component library, responsive layout, and theme tokens instead of inherited CSS. The old look is deliberately left behind.
+
 ## Source Site
 
 - **URL**: ${rootUrl}
@@ -70,9 +74,7 @@ Generated: ${generatedAt}
 
 ## What Changed
 
-The original site was a static or CMS-driven website likely served with outdated HTML, CSS, and
-minimal interactivity. This report summarizes how its content was restructured and regenerated as a
-modern, responsive Next.js 15 application using React, Tailwind CSS v4, and shadcn/ui components.
+The source was likely a static or CMS-driven site with legacy HTML and CSS. Below is how that content was **restructured into a typed schema** and **regenerated** as a Next.js 15 app (React, Tailwind CSS v4, shadcn-style components)—a new presentation layer, not a clone of the original layout.
 
 ### From old site to new stack
 
@@ -98,6 +100,14 @@ Colors extracted from the original site and applied as Tailwind CSS theme tokens
 ## Navigation (${nav.length} item${nav.length !== 1 ? 's' : ''})
 
 ${navList}
+
+## Footer
+
+${
+  schema.footer?.phone ?? schema.footer?.email ?? schema.footer?.address
+    ? `Global \`Footer\` receives \`SiteSchema.footer\` (phone, email, address) from extraction and \`layout.tsx\` passes them as props. Nav links use the horizontal row under the site name.`
+    : `No \`SiteSchema.footer\` on this schema — the generated footer shows site name and nav only. Add \`footer: { phone?, email?, address? }\` to include contact/location.`
+}
 
 ## Pages Generated (${pages.length})
 

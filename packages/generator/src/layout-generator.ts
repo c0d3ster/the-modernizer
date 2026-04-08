@@ -41,8 +41,13 @@ const serializeNav = (items: Array<{ label: string; url: string }>): string => {
   return `[\n${lines},\n]`
 }
 
+/**
+ * Root layout codegen. Extend `SiteSchema.footer` / `SiteSchema.generator` to change
+ * Footer contact props and nav cap without editing this file’s string shape for one-offs.
+ */
 export const generateLayout = (schema: SiteSchema): string => {
   const { siteName, nav, tagline, rootUrl, pages } = schema
+  const navMaxItems = schema.generator?.navMaxItems ?? 7
   const pagePathnames = new Set(
     pages.map((p) => {
       try { return new URL(p.url).pathname.replace(/\/$/, '') || '/' } catch { return p.url }
@@ -53,9 +58,15 @@ export const generateLayout = (schema: SiteSchema): string => {
       try { return pagePathnames.has(new URL(item.url, rootUrl).pathname.replace(/\/$/, '') || '/') }
       catch { return true } // keep external links
     })
-    .slice(0, 7)
+    .slice(0, navMaxItems)
   const navLiteral = serializeNav(flatNav)
   const description = tagline ?? siteName
+
+  const footerProps: string[] = []
+  if (schema.footer?.phone) footerProps.push(`phone={${JSON.stringify(schema.footer.phone)}}`)
+  if (schema.footer?.email) footerProps.push(`email={${JSON.stringify(schema.footer.email)}}`)
+  if (schema.footer?.address) footerProps.push(`address={${JSON.stringify(schema.footer.address)}}`)
+  const footerPropsStr = footerProps.length > 0 ? ` ${footerProps.join(' ')}` : ''
 
   return `import type { ReactElement, ReactNode } from 'react'
 import { Navbar } from '@/components/layout/Navbar'
@@ -73,9 +84,9 @@ const RootLayout = ({ children }: { children: ReactNode }): ReactElement => {
   return (
     <html lang='en'>
       <body>
-        <Navbar siteName='${siteName}' nav={nav} />
+        <Navbar siteName='${esc(siteName)}' nav={nav} />
         {children}
-        <Footer siteName='${siteName}' nav={nav} />
+        <Footer siteName='${esc(siteName)}' nav={nav}${footerPropsStr} />
       </body>
     </html>
   )

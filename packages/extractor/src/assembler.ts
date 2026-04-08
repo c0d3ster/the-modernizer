@@ -63,12 +63,22 @@ export const extract = async (
     })
   }
 
+  const footer =
+    siteData.footerPhone ?? siteData.footerEmail ?? siteData.footerAddress
+      ? {
+          ...(siteData.footerPhone && { phone: siteData.footerPhone }),
+          ...(siteData.footerEmail && { email: siteData.footerEmail }),
+          ...(siteData.footerAddress && { address: siteData.footerAddress }),
+        }
+      : undefined
+
   const siteSchema = {
     rootUrl,
     siteName: siteData.siteName,
     ...(siteData.tagline && { tagline: siteData.tagline }),
     brandColors: siteData.brandColors,
     nav: siteData.nav,
+    ...(footer && { footer }),
     pages,
   }
 

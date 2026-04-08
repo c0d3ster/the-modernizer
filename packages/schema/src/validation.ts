@@ -193,6 +193,16 @@ export const navItemSchema: z.ZodType<NavItem> = z.object({
   children: z.array(z.lazy(() => navItemSchema)).optional(),
 })
 
+export const siteFooterInfoSchema = z.object({
+  phone: z.string().optional(),
+  email: z.string().optional(),
+  address: z.string().optional(),
+})
+
+export const siteGeneratorPreferencesSchema = z.object({
+  navMaxItems: z.number().int().min(1).max(50).optional(),
+})
+
 export const siteSchemaSchema = z.object({
   rootUrl: z.string(),
   siteName: z.string(),
@@ -202,4 +212,6 @@ export const siteSchemaSchema = z.object({
   logoUrl: z.string().optional(),
   nav: z.array(navItemSchema),
   pages: z.array(pageSchemaSchema),
+  footer: siteFooterInfoSchema.optional(),
+  generator: siteGeneratorPreferencesSchema.optional(),
 })
