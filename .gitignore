@@ -18,6 +18,9 @@ coverage
 # Local test fixtures (crawled HTML + extracted schemas)
 **/fixtures/
 
+# Generator output (dev script default output dir)
+.generated/
+
 # Turbo
 .turbo
 **/.turbo
