@@ -1,6 +1,13 @@
 import type { SiteSchema } from '@modernizer/schema'
 import { urlToRoutePath, urlToComponentName } from './route-mapper.js'
 
+const mdTableCell = (s: string): string => s.replace(/\|/g, '\\|')
+
+const hasFooterContent = (footer: SiteSchema['footer']): boolean =>
+  Boolean(footer?.phone?.trim()) ||
+  Boolean(footer?.email?.trim()) ||
+  Boolean(footer?.address?.trim())
+
 const blockTypeLabel: Record<string, string> = {
   hero: 'Hero banner',
   text_section: 'Text section',
@@ -42,7 +49,8 @@ export const generateReport = (
       const route = urlToRoutePath(p.url)
       const component = urlToComponentName(p.url)
       const blockSummary = p.blocks.map((b) => blockTypeLabel[b.type] ?? b.type).join(', ')
-      return `| ${p.title ?? p.url} | \`${route}\` | \`${component}\` | ${blockSummary} |`
+      const titleCell = mdTableCell(String(p.title ?? p.url))
+      return `| ${titleCell} | \`${route}\` | \`${component}\` | ${mdTableCell(blockSummary)} |`
     })
     .join('\n')
 
@@ -104,7 +112,7 @@ ${navList}
 ## Footer
 
 ${
-  schema.footer?.phone ?? schema.footer?.email ?? schema.footer?.address
+  hasFooterContent(schema.footer)
     ? `Global \`Footer\` receives \`SiteSchema.footer\` (phone, email, address) from extraction and \`layout.tsx\` passes them as props. Nav links use the horizontal row under the site name.`
     : `No \`SiteSchema.footer\` on this schema — the generated footer shows site name and nav only. Add \`footer: { phone?, email?, address? }\` to include contact/location.`
 }

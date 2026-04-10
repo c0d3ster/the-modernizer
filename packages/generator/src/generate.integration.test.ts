@@ -165,11 +165,11 @@ describe('generateSite', () => {
   describe('app layout', () => {
     it('writes layout.tsx with site name and nav', async () => {
       const layout = await read('src/app/layout.tsx')
-      expect(layout).toContain("title: 'Sunrise Bakery'")
-      expect(layout).toContain("label: 'About'")
-      expect(layout).toContain("label: 'Contact'")
-      expect(layout).not.toContain("label: 'Menu'") // no /menu page exists, should be filtered
-      expect(layout).toContain("siteName='Sunrise Bakery'")
+      expect(layout).toContain('title: "Sunrise Bakery"')
+      expect(layout).toContain('"label": "About"')
+      expect(layout).toContain('"label": "Contact"')
+      expect(layout).not.toContain('"label": "Menu"') // no /menu page exists, should be filtered
+      expect(layout).toContain('siteName={"Sunrise Bakery"}')
       expect(layout).toContain('phone={"+1 (555) 012-3456"}')
       expect(layout).toContain('hello@example-bakery.com')
       expect(layout).toContain('42 Maple Street')

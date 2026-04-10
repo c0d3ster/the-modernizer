@@ -33,6 +33,7 @@ export const generatePackageJson = (schema: SiteSchema): string =>
         tailwindcss: '^4.0.0',
         '@tailwindcss/postcss': '^4.0.0',
         eslint: '^9.0.0',
+        '@eslint/eslintrc': '^3.0.0',
         'eslint-config-next': '^15.0.0',
       },
     },

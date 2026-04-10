@@ -15,6 +15,8 @@ const blockTypeToComponent = (type: string): string => {
   return type.split('_').map((p) => p.charAt(0).toUpperCase() + p.slice(1)).join('') + 'Block'
 }
 
+const isValidJsIdentifierKey = (k: string): boolean => /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(k)
+
 // Serializes a JS value as single-quoted object literal for code generation
 const serializeValue = (value: unknown, depth = 0): string => {
   if (value === null) return 'null'
@@ -40,7 +42,9 @@ const serializeValue = (value: unknown, depth = 0): string => {
     if (entries.length === 0) return '{}'
     const pad = '  '.repeat(depth + 1)
     const closePad = '  '.repeat(depth)
-    const lines = entries.map(([k, v]) => `${pad}${k}: ${serializeValue(v, depth + 1)}`).join(',\n')
+    const lines = entries
+      .map(([k, v]) => `${pad}${isValidJsIdentifierKey(k) ? k : JSON.stringify(k)}: ${serializeValue(v, depth + 1)}`)
+      .join(',\n')
     return `{\n${lines},\n${closePad}}`
   }
   return String(value)

@@ -63,12 +63,17 @@ export const extract = async (
     })
   }
 
+  const footerField = (v: string | undefined): v is string =>
+    v != null && v.trim() !== ''
+
   const footer =
-    siteData.footerPhone ?? siteData.footerEmail ?? siteData.footerAddress
+    footerField(siteData.footerPhone) ||
+    footerField(siteData.footerEmail) ||
+    footerField(siteData.footerAddress)
       ? {
-          ...(siteData.footerPhone && { phone: siteData.footerPhone }),
-          ...(siteData.footerEmail && { email: siteData.footerEmail }),
-          ...(siteData.footerAddress && { address: siteData.footerAddress }),
+          ...(footerField(siteData.footerPhone) && { phone: siteData.footerPhone }),
+          ...(footerField(siteData.footerEmail) && { email: siteData.footerEmail }),
+          ...(footerField(siteData.footerAddress) && { address: siteData.footerAddress }),
         }
       : undefined
 

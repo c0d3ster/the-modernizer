@@ -34,13 +34,6 @@ export const flattenNav = (nav: NavItem[], rootUrl: string): Array<{ label: stri
   return result
 }
 
-const esc = (s: string): string => s.replace(/\\/g, '\\\\').replace(/'/g, "\\'")
-
-const serializeNav = (items: Array<{ label: string; url: string }>): string => {
-  const lines = items.map((item) => `  { label: '${esc(item.label)}', url: '${esc(item.url)}' }`).join(',\n')
-  return `[\n${lines},\n]`
-}
-
 /**
  * Root layout codegen. Extend `SiteSchema.footer` / `SiteSchema.generator` to change
  * Footer contact props and nav cap without editing this file’s string shape for one-offs.
@@ -59,7 +52,7 @@ export const generateLayout = (schema: SiteSchema): string => {
       catch { return true } // keep external links
     })
     .slice(0, navMaxItems)
-  const navLiteral = serializeNav(flatNav)
+  const navLiteral = JSON.stringify(flatNav, null, 2)
   const description = tagline ?? siteName
 
   const footerProps: string[] = []
@@ -74,8 +67,8 @@ import { Footer } from '@/components/layout/Footer'
 import './globals.css'
 
 export const metadata = {
-  title: '${siteName}',
-  description: '${description.replace(/'/g, "\\'")}',
+  title: ${JSON.stringify(siteName)},
+  description: ${JSON.stringify(description)},
 }
 
 const nav = ${navLiteral}
@@ -84,9 +77,9 @@ const RootLayout = ({ children }: { children: ReactNode }): ReactElement => {
   return (
     <html lang='en'>
       <body>
-        <Navbar siteName='${esc(siteName)}' nav={nav} />
+        <Navbar siteName={${JSON.stringify(siteName)}} nav={nav} />
         {children}
-        <Footer siteName='${esc(siteName)}' nav={nav}${footerPropsStr} />
+        <Footer siteName={${JSON.stringify(siteName)}} nav={nav}${footerPropsStr} />
       </body>
     </html>
   )
@@ -99,10 +92,19 @@ export default RootLayout
 /** Warm neutral when the schema does not specify a page background (avoids harsh #fff). */
 const DEFAULT_PAGE_BACKGROUND = '#f4f1ec'
 
+/** Only emit values that are plausible CSS colors; avoids broken or hostile input in generated CSS. */
+const sanitizeThemeColor = (value: string | undefined, fallback: string): string => {
+  if (value == null || typeof value !== 'string') return fallback
+  const t = value.trim()
+  if (/^#[0-9a-fA-F]{3,8}$/.test(t)) return t
+  if (/^(?:rgb|hsl|oklch|hwb|lab|lch)\(/i.test(t)) return t
+  return fallback
+}
+
 export const generateGlobalsCss = (brandColors: BrandColors): string => {
-  const primary = brandColors.primary ?? '#2563eb'
-  const primaryForeground = brandColors.text ?? '#ffffff'
-  const background = brandColors.background ?? DEFAULT_PAGE_BACKGROUND
+  const primary = sanitizeThemeColor(brandColors.primary, '#2563eb')
+  const primaryForeground = sanitizeThemeColor(brandColors.text, '#ffffff')
+  const background = sanitizeThemeColor(brandColors.background, DEFAULT_PAGE_BACKGROUND)
 
   return `@import "tailwindcss";
 @source "../";

@@ -7,7 +7,7 @@
 import { readFile } from 'node:fs/promises'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import type { SiteSchema } from '@modernizer/schema'
+import { siteSchemaSchema } from '@modernizer/schema'
 import { generateSite } from '../src/index.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -31,7 +31,8 @@ if (!schemaArg) {
 const schemaPath = resolve(schemaArg)
 console.log(`Loading schema: ${schemaPath}`)
 const raw = await readFile(schemaPath, 'utf-8')
-const schema: SiteSchema = JSON.parse(raw)
+const parsed: unknown = JSON.parse(raw)
+const schema = siteSchemaSchema.parse(parsed)
 console.log(`  Site: ${schema.siteName}`)
 console.log(`  Pages: ${schema.pages.length}`)
 console.log(`  Output: ${outPath}\n`)

@@ -15,7 +15,7 @@ export const HeroBlock = ({ block }: HeroBlockProps): React.ReactElement => {
       className={cn(
         'relative w-full',
         backgroundImageUrl
-          ? 'h-[93dvh] max-h-[93dvh] overflow-hidden bg-black text-white'
+          ? 'min-h-[93dvh] bg-black text-white'
           : 'flex min-h-[480px] flex-col items-center bg-primary py-20 text-primary-foreground lg:py-32'
       )}
     >
