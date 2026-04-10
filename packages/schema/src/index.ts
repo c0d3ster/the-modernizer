@@ -19,7 +19,13 @@ export type {
 export { PageArchetype } from './page.js'
 export type { PageSchema } from './page.js'
 
-export type { NavItem, BrandColors, SiteSchema } from './site.js'
+export type {
+  NavItem,
+  BrandColors,
+  SiteFooterInfo,
+  SiteGeneratorPreferences,
+  SiteSchema,
+} from './site.js'
 
 export type { FetchMethod, CrawlResult, CrawlOptions } from './crawl.js'
 
@@ -43,5 +49,7 @@ export {
   pageSchemaSchema,
   brandColorsSchema,
   navItemSchema,
+  siteFooterInfoSchema,
+  siteGeneratorPreferencesSchema,
   siteSchemaSchema,
 } from './validation.js'

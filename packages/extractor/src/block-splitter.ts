@@ -7,7 +7,7 @@ const SPLIT_TAGS = new Set(['h1', 'h2', 'h3', 'h4', 'hr', 'section', 'article'])
 // known WordPress/generic wrapper IDs and classes that contain content but are not content themselves
 const WRAPPER_SELECTORS = [
   '#wrap', '#wrapper', '#page', '#container', '#main-wrapper', '#outer-wrapper',
-  '#content-wrapper', '#site', '#site-wrapper', '#body-wrapper',
+  '#content-wrapper', '#site', '#site-wrapper', '#body-wrapper', '#inner',
 ]
 
 // preferred content area selectors — try these before falling back to body children
@@ -22,7 +22,18 @@ const CONTENT_SELECTORS = [
   '.post-content',
   '.page-content',
   '.content-area',
+  '#inner',
 ]
+
+// Elements within the body that are chrome, not content
+const RESIDUAL_CHROME_SELECTOR = [
+  'nav', 'header', 'footer',
+  '#header', '#footer', '#nav', '#navbar',
+  '#navigation', '#main-navigation',
+  '.main-navigation', '.nav-menu',
+  '.site-header', '.site-footer',
+  '.widget-area', '.sidebar', '#sidebar',
+].join(', ')
 
 export interface RawBlock {
   html: string
@@ -34,9 +45,8 @@ const hasSubstantialText = (html: string): boolean => {
   return $('body').text().replace(/\s+/g, ' ').trim().length > 30
 }
 
-// strip leftover chrome elements that should have been removed earlier
 const stripResidualChrome = ($: cheerio.CheerioAPI): void => {
-  $('nav, header, footer, #header, #footer, #navbar, #navigation, #main-navigation, .main-navigation, .nav-menu, .site-header, .site-footer, .widget-area, .sidebar, #sidebar').remove()
+  $(RESIDUAL_CHROME_SELECTOR).remove()
 }
 
 const getContentRoot = ($: cheerio.CheerioAPI): ReturnType<cheerio.CheerioAPI> => {
@@ -78,21 +88,17 @@ const getContentRoot = ($: cheerio.CheerioAPI): ReturnType<cheerio.CheerioAPI> =
   return root
 }
 
-export const splitBlocks = (contentHtml: string): RawBlock[] => {
-  const $ = cheerio.load(contentHtml)
-
-  stripResidualChrome($)
-
-  const root = getContentRoot($)
-  const blocks: RawBlock[] = []
-  let current: string[] = []
+// Collect blocks from an element, recursing into substantial divs that
+// themselves contain multiple substantial children (e.g. WordPress widget columns).
+const collectBlocks = ($: cheerio.CheerioAPI, root: ReturnType<cheerio.CheerioAPI>, blocks: RawBlock[]): void => {
+  const current: string[] = []
 
   const flushCurrent = (): void => {
     const html = current.join('\n').trim()
     if (html && hasSubstantialText(html)) {
       blocks.push({ html })
     }
-    current = []
+    current.length = 0
   }
 
   root.children().each((_, el) => {
@@ -115,15 +121,37 @@ export const splitBlocks = (contentHtml: string): RawBlock[] => {
         }
       }
     } else if (tag === 'div' && hasSubstantialText(elHtml)) {
-      // substantial top-level div (e.g. page builder row) — treat as a section boundary
-      flushCurrent()
-      blocks.push({ html: elHtml })
+      // Check whether this div is itself a multi-section container (e.g. a
+      // widget column or page-builder row). If it has multiple substantial
+      // child divs, recurse rather than treating it as one opaque block.
+      const substantialChildren = $(el).children('div').filter((_, child) =>
+        hasSubstantialText($.html(child) ?? '')
+      )
+
+      if (substantialChildren.length >= 2) {
+        flushCurrent()
+        collectBlocks($, $(el), blocks)
+      } else {
+        flushCurrent()
+        blocks.push({ html: elHtml })
+      }
     } else {
       current.push(elHtml)
     }
   })
 
   flushCurrent()
+}
+
+export const splitBlocks = (contentHtml: string): RawBlock[] => {
+  const $ = cheerio.load(contentHtml)
+
+  stripResidualChrome($)
+
+  const root = getContentRoot($)
+  const blocks: RawBlock[] = []
+
+  collectBlocks($, root, blocks)
 
   // merge down to MAX_BLOCKS by combining adjacent blocks without headings
   while (blocks.length > MAX_BLOCKS) {

@@ -8,6 +8,7 @@ import { extractMetadata } from './metadata-extractor.js'
 import { splitBlocks } from './block-splitter.js'
 import { classifyBlocks } from './block-classifier.js'
 import { extractSiteData } from './site-extractor.js'
+import { extractCandidateColors } from './color-extractor.js'
 import type { CrawlResult } from '@modernizer/schema'
 
 export interface ExtractOptions {
@@ -37,8 +38,11 @@ export const extract = async (
     uniqueResults.map((r) => ({ url: r.url, rawHtml: r.rawHtml }))
   )
 
+  // --- deterministic: extract color candidates from all raw HTML ---
+  const colorCandidates = extractCandidateColors(uniqueResults)
+
   // --- LLM: site-level data from chrome (1 call) ---
-  const siteData = await extractSiteData(chromeHtml, rootUrl)
+  const siteData = await extractSiteData(chromeHtml, rootUrl, colorCandidates)
 
   // --- LLM: per-page block classification (1 call per page, sequential to respect rate limits) ---
   const pages = []
@@ -59,12 +63,27 @@ export const extract = async (
     })
   }
 
+  const footerField = (v: string | undefined): v is string =>
+    v != null && v.trim() !== ''
+
+  const footer =
+    footerField(siteData.footerPhone) ||
+    footerField(siteData.footerEmail) ||
+    footerField(siteData.footerAddress)
+      ? {
+          ...(footerField(siteData.footerPhone) && { phone: siteData.footerPhone }),
+          ...(footerField(siteData.footerEmail) && { email: siteData.footerEmail }),
+          ...(footerField(siteData.footerAddress) && { address: siteData.footerAddress }),
+        }
+      : undefined
+
   const siteSchema = {
     rootUrl,
     siteName: siteData.siteName,
     ...(siteData.tagline && { tagline: siteData.tagline }),
     brandColors: siteData.brandColors,
     nav: siteData.nav,
+    ...(footer && { footer }),
     pages,
   }
 

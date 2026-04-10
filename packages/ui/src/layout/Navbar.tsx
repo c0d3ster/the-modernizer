@@ -18,19 +18,30 @@ export const Navbar = ({ siteName, nav, ctaText, ctaUrl }: NavbarProps): React.R
   const [open, setOpen] = React.useState(false)
 
   return (
-    <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur">
+    <header className="sticky top-0 z-50 border-b border-primary/15 bg-primary text-primary-foreground shadow-sm">
       <div className={cn(container, 'flex h-16 items-center justify-between')}>
-        <a href="/" className="text-lg font-bold tracking-tight">{siteName}</a>
+        <a href="/" className="text-lg font-bold tracking-tight text-primary-foreground">
+          {siteName}
+        </a>
 
         {/* desktop nav */}
         <nav className="hidden items-center gap-6 md:flex">
           {nav.map((item) => (
-            <a key={item.url} href={item.url} className="text-sm text-muted-foreground transition-colors hover:text-foreground">
+            <a
+              key={item.url}
+              href={item.url}
+              className="text-sm text-primary-foreground/85 transition-colors hover:text-primary-foreground"
+            >
               {item.label}
             </a>
           ))}
           {ctaText && ctaUrl && (
-            <Button asChild size="sm">
+            <Button
+              asChild
+              size="sm"
+              variant="outline"
+              className="border-primary-foreground/35 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20"
+            >
               <a href={ctaUrl}>{ctaText}</a>
             </Button>
           )}
@@ -38,7 +49,8 @@ export const Navbar = ({ siteName, nav, ctaText, ctaUrl }: NavbarProps): React.R
 
         {/* mobile toggle */}
         <button
-          className="md:hidden"
+          type="button"
+          className="text-primary-foreground md:hidden"
           onClick={() => setOpen((o) => !o)}
           aria-label={open ? 'Close menu' : 'Open menu'}
         >
@@ -48,15 +60,25 @@ export const Navbar = ({ siteName, nav, ctaText, ctaUrl }: NavbarProps): React.R
 
       {/* mobile menu */}
       {open && (
-        <div className="border-t bg-background px-4 py-4 md:hidden">
+        <div className="border-t border-primary-foreground/15 bg-primary px-4 py-4 md:hidden">
           <nav className="flex flex-col gap-4">
             {nav.map((item) => (
-              <a key={item.url} href={item.url} className="text-sm text-muted-foreground" onClick={() => setOpen(false)}>
+              <a
+                key={item.url}
+                href={item.url}
+                className="text-sm text-primary-foreground/90"
+                onClick={() => setOpen(false)}
+              >
                 {item.label}
               </a>
             ))}
             {ctaText && ctaUrl && (
-              <Button asChild size="sm" className="w-fit">
+              <Button
+                asChild
+                size="sm"
+                variant="outline"
+                className="w-fit border-primary-foreground/35 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20"
+              >
                 <a href={ctaUrl}>{ctaText}</a>
               </Button>
             )}
