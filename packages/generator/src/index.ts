@@ -5,8 +5,9 @@ import type { SiteSchema } from '@modernizer/schema'
 import { urlToRoutePath, urlToComponentName } from './route-mapper.js'
 import { copyComponents } from './component-copier.js'
 import { generatePage } from './page-generator.js'
-import { generateLayout, generateGlobalsCss, flattenNav } from './layout-generator.js'
+import { generateLayout, generateGlobalsCss, buildNav } from './layout-generator.js'
 import { generateReport } from './report-generator.js'
+import { placeBlocks } from './block-placer.js'
 import {
   generatePackageJson,
   generateNextConfig,
@@ -33,6 +34,10 @@ const copySampleAssetsToPublic = async (outputDir: string): Promise<void> => {
 }
 
 export const generateSite = async (schema: SiteSchema, outputDir: string): Promise<void> => {
+  // 0. Apply intelligent block placement rules (contact info → footer, etc.)
+  const { schema: placedSchema } = placeBlocks(schema)
+  schema = placedSchema
+
   // 1. Copy component library (shadcn primitives, blocks, layout, lib, styles, schema types)
   await copyComponents(outputDir)
   await copySampleAssetsToPublic(outputDir)
@@ -43,12 +48,7 @@ export const generateSite = async (schema: SiteSchema, outputDir: string): Promi
       try { return new URL(p.url).pathname.replace(/\/$/, '') || '/' } catch { return p.url }
     })
   )
-  const nav = flattenNav(schema.nav, schema.rootUrl)
-    .filter((item) => {
-      try { return pagePathnames.has(new URL(item.url, schema.rootUrl).pathname.replace(/\/$/, '') || '/') }
-      catch { return true }
-    })
-    .slice(0, 7)
+  const nav = buildNav(schema.nav, schema.rootUrl, pagePathnames, 7)
 
   await Promise.all([
     writeFile(join(outputDir, 'package.json'), generatePackageJson(schema)),

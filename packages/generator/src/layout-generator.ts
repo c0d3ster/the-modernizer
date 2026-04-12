@@ -1,35 +1,82 @@
 import type { SiteSchema, BrandColors, NavItem } from '@modernizer/schema'
 
-// Flattens the nav tree into a single level, strips origins from same-site
-// URLs, and skips anchor-only items (#) that have no real destination.
+const toRelative = (url: string, origin: string): string | null => {
+  if (!url || url === '#') return null
+  try {
+    const parsed = new URL(url)
+    if (parsed.origin === origin) return parsed.pathname.replace(/\/$/, '') || '/'
+    return url
+  } catch {
+    return url
+  }
+}
+
+const MAX_CHILDREN_PER_GROUP = 5
+
+/**
+ * Builds a clean nav tree from the raw schema nav:
+ * - strips homepage (/) from all items — always reachable via the logo
+ * - dedupes children across groups by URL (first occurrence wins)
+ * - filters children to only crawled pages
+ * - collapses single-child groups into a top-level link (dropdown with one item is just friction)
+ * - caps children per group at MAX_CHILDREN_PER_GROUP
+ * - caps total top-level items at navMaxItems
+ */
+export const buildNav = (nav: NavItem[], rootUrl: string, pagePathnames: Set<string>, navMaxItems: number): NavItem[] => {
+  const origin = new URL(rootUrl).origin
+  const seenUrls = new Set<string>(['/', '']) // pre-seed homepage so it's always excluded
+
+  const processChild = (child: NavItem): NavItem | null => {
+    const childUrl = toRelative(child.url, origin)
+    if (!childUrl) return null
+    const isInternal = (() => { try { return new URL(child.url).origin === origin } catch { return false } })()
+    if (isInternal && !pagePathnames.has(new URL(child.url).pathname.replace(/\/$/, '') || '/')) return null
+    if (seenUrls.has(childUrl)) return null
+    seenUrls.add(childUrl)
+    return { label: child.label, url: childUrl }
+  }
+
+  const processItem = (item: NavItem): NavItem | NavItem[] | null => {
+    const url = toRelative(item.url, origin)
+    const children = item.children
+      ?.map(processChild)
+      .filter((c): c is NavItem => c !== null)
+      .slice(0, MAX_CHILDREN_PER_GROUP)
+
+    const hasRealUrl = url && url !== '#' && !seenUrls.has(url) && pagePathnames.has(url)
+    const hasChildren = children && children.length > 0
+
+    if (!hasRealUrl && !hasChildren) return null
+
+    // Single-child group: promote the child to top-level, drop the wrapper
+    if (!hasRealUrl && children?.length === 1) return children[0]!
+
+    if (hasRealUrl) seenUrls.add(url)
+
+    const result: NavItem = { label: item.label, url: url ?? '#' }
+    if (hasChildren) result.children = children
+    return result
+  }
+
+  return nav
+    .flatMap((item) => {
+      const result = processItem(item)
+      if (result === null) return []
+      return Array.isArray(result) ? result : [result]
+    })
+    .slice(0, navMaxItems)
+}
+
+/** @deprecated Use buildNav instead — flattenNav destroys hierarchy */
 export const flattenNav = (nav: NavItem[], rootUrl: string): Array<{ label: string; url: string }> => {
   const origin = new URL(rootUrl).origin
-
-  const toRelative = (url: string): string | null => {
-    if (!url || url === '#') return null
-    try {
-      const parsed = new URL(url)
-      if (parsed.origin === origin) {
-        return parsed.pathname.replace(/\/$/, '') || '/'
-      }
-      return url // external link — keep as-is
-    } catch {
-      return url // already relative
-    }
-  }
-
   const seen = new Set<string>()
   const result: Array<{ label: string; url: string }> = []
-
   const collect = (item: NavItem): void => {
-    const url = toRelative(item.url)
-    if (url && !seen.has(url)) {
-      seen.add(url)
-      result.push({ label: item.label, url })
-    }
+    const url = toRelative(item.url, origin)
+    if (url && !seen.has(url)) { seen.add(url); result.push({ label: item.label, url }) }
     item.children?.forEach(collect)
   }
-
   nav.forEach(collect)
   return result
 }
@@ -46,13 +93,8 @@ export const generateLayout = (schema: SiteSchema): string => {
       try { return new URL(p.url).pathname.replace(/\/$/, '') || '/' } catch { return p.url }
     })
   )
-  const flatNav = flattenNav(nav, rootUrl)
-    .filter((item) => {
-      try { return pagePathnames.has(new URL(item.url, rootUrl).pathname.replace(/\/$/, '') || '/') }
-      catch { return true } // keep external links
-    })
-    .slice(0, navMaxItems)
-  const navLiteral = JSON.stringify(flatNav, null, 2)
+  const builtNav = buildNav(nav, rootUrl, pagePathnames, navMaxItems)
+  const navLiteral = JSON.stringify(builtNav, null, 2)
   const description = tagline ?? siteName
 
   const footerProps: string[] = []

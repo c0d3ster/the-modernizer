@@ -5,13 +5,101 @@ import type { NavItem } from '@modernizer/schema'
 import { Button } from '../shadcn/button'
 import { cn } from '../lib/cn'
 import { container } from '../styles/tokens'
-import { Menu, X } from 'lucide-react'
+import { Menu, X, ChevronDown } from 'lucide-react'
 
 interface NavbarProps {
   siteName: string
   nav: NavItem[]
   ctaText?: string
   ctaUrl?: string
+}
+
+const DesktopDropdown = ({ item }: { item: NavItem }): React.ReactElement => {
+  const hasChildren = item.children && item.children.length > 0
+  const linkHref = item.url && item.url !== '#' ? item.url : undefined
+
+  if (!hasChildren) {
+    return (
+      <a
+        href={linkHref ?? '#'}
+        className="text-sm text-primary-foreground/85 transition-colors hover:text-primary-foreground"
+      >
+        {item.label}
+      </a>
+    )
+  }
+
+  return (
+    <div className="group relative">
+      <button
+        type="button"
+        className="flex items-center gap-1 text-sm text-primary-foreground/85 transition-colors hover:text-primary-foreground"
+      >
+        {linkHref ? (
+          <a href={linkHref}>{item.label}</a>
+        ) : (
+          item.label
+        )}
+        <ChevronDown className="h-3.5 w-3.5 transition-transform group-hover:rotate-180" />
+      </button>
+      <div className="invisible absolute left-0 top-full z-50 mt-1 min-w-[180px] rounded-md border border-border bg-card py-1 shadow-lg opacity-0 transition-all group-hover:visible group-hover:opacity-100">
+        {item.children!.map((child) => (
+          <a
+            key={child.url}
+            href={child.url}
+            className="block px-4 py-2 text-sm text-foreground/80 hover:bg-accent hover:text-foreground"
+          >
+            {child.label}
+          </a>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+const MobileNavItem = ({ item, onClose }: { item: NavItem; onClose: () => void }): React.ReactElement => {
+  const [expanded, setExpanded] = React.useState(false)
+  const hasChildren = item.children && item.children.length > 0
+  const linkHref = item.url && item.url !== '#' ? item.url : undefined
+
+  if (!hasChildren) {
+    return (
+      <a
+        href={linkHref ?? '#'}
+        className="text-sm text-primary-foreground/90"
+        onClick={onClose}
+      >
+        {item.label}
+      </a>
+    )
+  }
+
+  return (
+    <div>
+      <button
+        type="button"
+        className="flex w-full items-center justify-between text-sm text-primary-foreground/90"
+        onClick={() => setExpanded((e) => !e)}
+      >
+        {item.label}
+        <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', expanded && 'rotate-180')} />
+      </button>
+      {expanded && (
+        <div className="mt-2 ml-3 flex flex-col gap-3 border-l border-primary-foreground/20 pl-3">
+          {item.children!.map((child) => (
+            <a
+              key={child.url}
+              href={child.url}
+              className="text-sm text-primary-foreground/75"
+              onClick={onClose}
+            >
+              {child.label}
+            </a>
+          ))}
+        </div>
+      )}
+    </div>
+  )
 }
 
 export const Navbar = ({ siteName, nav, ctaText, ctaUrl }: NavbarProps): React.ReactElement => {
@@ -27,13 +115,7 @@ export const Navbar = ({ siteName, nav, ctaText, ctaUrl }: NavbarProps): React.R
         {/* desktop nav */}
         <nav className="hidden items-center gap-6 md:flex">
           {nav.map((item) => (
-            <a
-              key={item.url}
-              href={item.url}
-              className="text-sm text-primary-foreground/85 transition-colors hover:text-primary-foreground"
-            >
-              {item.label}
-            </a>
+            <DesktopDropdown key={item.url + item.label} item={item} />
           ))}
           {ctaText && ctaUrl && (
             <Button
@@ -63,14 +145,7 @@ export const Navbar = ({ siteName, nav, ctaText, ctaUrl }: NavbarProps): React.R
         <div className="border-t border-primary-foreground/15 bg-primary px-4 py-4 md:hidden">
           <nav className="flex flex-col gap-4">
             {nav.map((item) => (
-              <a
-                key={item.url}
-                href={item.url}
-                className="text-sm text-primary-foreground/90"
-                onClick={() => setOpen(false)}
-              >
-                {item.label}
-              </a>
+              <MobileNavItem key={item.url + item.label} item={item} onClose={() => setOpen(false)} />
             ))}
             {ctaText && ctaUrl && (
               <Button
