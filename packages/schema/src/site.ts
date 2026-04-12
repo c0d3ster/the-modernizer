@@ -26,8 +26,10 @@ export interface SiteFooterInfo {
  * Add fields here as new layout or copy rules are generalized.
  */
 export interface SiteGeneratorPreferences {
-  /** Cap flattened nav items in Navbar + Footer (default 7). */
+  /** Cap nav items in Navbar + Footer (default 7). */
   navMaxItems?: number
+  /** Skip synthesizing a hero on the homepage even when none was extracted (default: false). */
+  noHero?: boolean
 }
 
 export interface SiteSchema {
