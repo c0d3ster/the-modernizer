@@ -14,14 +14,14 @@ export const TeamGridBlock = ({ block }: TeamGridBlockProps): React.ReactElement
     <section className={cn(section, 'bg-muted/40')}>
       <div className={container}>
         {heading && (
-          <h2 className="mb-12 text-center text-3xl font-bold tracking-tight lg:text-4xl">{heading}</h2>
+          <h2 className="mb-12 text-center text-3xl font-bold tracking-tight text-primary lg:text-4xl">{heading}</h2>
         )}
         <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {members.map((member, i) => (
             <div key={i} className="flex flex-col items-center text-center">
               <Avatar className="mb-4 h-24 w-24">
                 {member.photoUrl && <AvatarImage src={member.photoUrl} alt={member.name} />}
-                <AvatarFallback className="text-lg">{member.name.slice(0, 2).toUpperCase()}</AvatarFallback>
+                <AvatarFallback className="bg-primary text-primary-foreground text-lg">{member.name.slice(0, 2).toUpperCase()}</AvatarFallback>
               </Avatar>
               <h3 className="font-semibold">{member.name}</h3>
               {member.role && <p className="text-sm text-primary">{member.role}</p>}

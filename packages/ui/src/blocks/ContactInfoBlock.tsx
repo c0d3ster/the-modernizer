@@ -15,7 +15,7 @@ export const ContactInfoBlock = ({ block }: ContactInfoBlockProps): React.ReactE
     <section className={cn(section)}>
       <div className={container}>
         {heading && (
-          <h2 className="mb-10 text-3xl font-bold tracking-tight lg:text-4xl">{heading}</h2>
+          <h2 className="mb-10 text-3xl font-bold tracking-tight text-primary lg:text-4xl">{heading}</h2>
         )}
         <div className={cn('grid gap-8', mapEmbedUrl ? 'lg:grid-cols-2' : 'max-w-lg')}>
           <Card>

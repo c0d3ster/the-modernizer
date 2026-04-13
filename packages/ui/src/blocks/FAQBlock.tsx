@@ -16,7 +16,7 @@ export const FAQBlock = ({ block }: FAQBlockProps): React.ReactElement => {
     <section className={cn(section, 'bg-muted/40')}>
       <div className={cn(container, 'max-w-3xl')}>
         {heading && (
-          <h2 className="mb-10 text-3xl font-bold tracking-tight lg:text-4xl">{heading}</h2>
+          <h2 className="mb-10 text-3xl font-bold tracking-tight text-primary lg:text-4xl">{heading}</h2>
         )}
         <Accordion type="single" collapsible className="w-full">
           {items.map((item, i) => (

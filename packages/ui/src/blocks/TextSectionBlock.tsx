@@ -13,7 +13,7 @@ export const TextSectionBlock = ({ block }: TextSectionBlockProps): React.ReactE
     <section className={cn(section)}>
       <div className={cn(container, 'max-w-3xl')}>
         {heading && (
-          <h2 className="mb-6 text-3xl font-bold tracking-tight lg:text-4xl">{heading}</h2>
+          <h2 className="mb-6 text-3xl font-bold tracking-tight text-primary lg:text-4xl">{heading}</h2>
         )}
         <div className="prose prose-lg max-w-none text-muted-foreground">
           {body.split('\n\n').map((paragraph, i) => (
