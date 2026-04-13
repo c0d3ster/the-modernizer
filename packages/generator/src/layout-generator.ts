@@ -48,8 +48,8 @@ export const buildNav = (nav: NavItem[], rootUrl: string, pagePathnames: Set<str
 
     if (!hasRealUrl && !hasChildren) return null
 
-    // Single-child group: promote the child to top-level, drop the wrapper
-    if (!hasRealUrl && children?.length === 1) return children[0]!
+    // Single-child group: keep parent label but link directly to the one child (no dropdown)
+    if (!hasRealUrl && children?.length === 1) return { label: item.label, url: children[0]!.url }
 
     if (hasRealUrl) seenUrls.add(url)
 

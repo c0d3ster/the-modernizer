@@ -78,9 +78,14 @@ const sanitizeBlock = (block: ContentBlock): ContentBlock => {
   return { ...b, rawHtml: sanitizeGenericHtml(b.rawHtml) }
 }
 
-const blockToJsx = (block: ContentBlock): string => {
+// Blocks that own their own background (primary, black, etc.) — excluded from alternating rhythm
+const SELF_COLORED_BLOCKS = new Set(['hero', 'cta', 'stats'])
+
+const blockToJsx = (block: ContentBlock, alt: boolean): string => {
   const component = blockTypeToComponent(block.type)
-  return `      <${component} block={${serializeValue(block, 2)}} />`
+  const inner = `      <${component} block={${serializeValue(block, 2)}} />`
+  if (!alt) return inner
+  return `      <div className="bg-muted/40">\n  ${inner}\n      </div>`
 }
 
 export const generatePage = (page: PageSchema, componentName: string): string => {
@@ -90,7 +95,13 @@ export const generatePage = (page: PageSchema, componentName: string): string =>
     .map((c) => `import { ${c} } from '@/components/blocks/${c}'`)
     .join('\n')
 
-  const jsx = page.blocks.map(sanitizeBlock).map(blockToJsx).join('\n')
+  // Alternate muted backgrounds on plain content blocks for visual rhythm.
+  // Self-colored blocks (hero, cta, stats) break the sequence and reset the counter.
+  let altCounter = 0
+  const jsx = page.blocks.map(sanitizeBlock).map((block) => {
+    if (SELF_COLORED_BLOCKS.has(block.type)) { altCounter = 0; return blockToJsx(block, false) }
+    return blockToJsx(block, altCounter++ % 2 === 1)
+  }).join('\n')
 
   return `import type { ReactElement } from 'react'
 ${imports}

@@ -8,7 +8,7 @@ import { generatePage } from './page-generator.js'
 import { generateLayout, generateGlobalsCss, buildNav } from './layout-generator.js'
 import { generateReport } from './report-generator.js'
 import { placeBlocks } from './block-placer.js'
-import { synthesizeHero } from './hero-synthesizer.js'
+import { synthesizeHero, synthesizePageHeaders } from './hero-synthesizer.js'
 import {
   generatePackageJson,
   generateNextConfig,
@@ -38,6 +38,7 @@ export const generateSite = async (schema: SiteSchema, outputDir: string): Promi
   // 0. Apply intelligent block placement rules (contact info → footer, etc.)
   const { schema: placedSchema } = placeBlocks(schema)
   schema = synthesizeHero(placedSchema)
+  schema = synthesizePageHeaders(schema)
 
   // 1. Copy component library (shadcn primitives, blocks, layout, lib, styles, schema types)
   await copyComponents(outputDir)

@@ -28,6 +28,31 @@ const toRelativePath = (url: string, rootUrl: string): string => {
 }
 
 /**
+ * Ensures every non-home page starts with a visual header (solid-color hero, no image).
+ * Uses the page title as the heading and metaDescription as subheading if available.
+ * Skips pages that already open with a hero block.
+ */
+export const synthesizePageHeaders = (schema: SiteSchema): SiteSchema => {
+  if (schema.generator?.noHero) return schema
+
+  const pages = schema.pages.map((page) => {
+    const isHome = (() => { try { return (new URL(page.url).pathname.replace(/\/$/, '') || '/') === '/' } catch { return false } })()
+    if (isHome) return page
+    if (page.blocks[0]?.type === 'hero') return page
+
+    const header: HeroBlock = {
+      type: 'hero',
+      heading: page.title,
+      subheading: page.metaDescription,
+    }
+
+    return { ...page, blocks: [header, ...page.blocks] }
+  })
+
+  return { ...schema, pages }
+}
+
+/**
  * Ensures the homepage has a hero block at the top.
  *
  * - If the homepage already starts with a hero, does nothing.

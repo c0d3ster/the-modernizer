@@ -82,14 +82,13 @@ describe('buildNav (Edgehill)', () => {
     expect(labels).toContain('Daily Schedule')
   })
 
-  it('For the Family collapses to a top-level link (only Client Visitation survives after dedup)', () => {
-    // Should NOT appear as a group with children
-    const group = result.find((i) => i.label === 'For the Family')
-    expect(group).toBeUndefined()
-    // Client Visitation should be promoted to top-level
-    const promoted = result.find((i) => i.label === 'Client Visitation')
-    expect(promoted).toBeDefined()
-    expect(promoted?.children).toBeUndefined()
+  it('For the Family collapses to a top-level link using parent label pointing to sole child URL', () => {
+    const item = result.find((i) => i.label === 'For the Family')
+    expect(item).toBeDefined()
+    expect(item?.children).toBeUndefined()
+    expect(item?.url).toBe('/for-the-family/client-visitation')
+    // Should NOT appear under its own child label
+    expect(result.find((i) => i.label === 'Client Visitation')).toBeUndefined()
   })
 
   it('Support Us keeps all 3 children', () => {
