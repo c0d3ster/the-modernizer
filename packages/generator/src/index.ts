@@ -5,8 +5,10 @@ import type { SiteSchema } from '@modernizer/schema'
 import { urlToRoutePath, urlToComponentName } from './route-mapper.js'
 import { copyComponents } from './component-copier.js'
 import { generatePage } from './page-generator.js'
-import { generateLayout, generateGlobalsCss, flattenNav } from './layout-generator.js'
+import { generateLayout, generateGlobalsCss, buildNav } from './layout-generator.js'
 import { generateReport } from './report-generator.js'
+import { placeBlocks } from './block-placer.js'
+import { synthesizeHero, synthesizePageHeaders } from './hero-synthesizer.js'
 import {
   generatePackageJson,
   generateNextConfig,
@@ -33,22 +35,28 @@ const copySampleAssetsToPublic = async (outputDir: string): Promise<void> => {
 }
 
 export const generateSite = async (schema: SiteSchema, outputDir: string): Promise<void> => {
+  // 0. Apply intelligent block placement rules (contact info → footer, etc.)
+  const { schema: placedSchema } = placeBlocks(schema)
+  schema = synthesizeHero(placedSchema)
+  schema = synthesizePageHeaders(schema)
+
   // 1. Copy component library (shadcn primitives, blocks, layout, lib, styles, schema types)
   await copyComponents(outputDir)
   await copySampleAssetsToPublic(outputDir)
 
   // 2. Config files at project root
+  const base = schema.rootUrl
+  const navMaxItems = schema.generator?.navMaxItems ?? 7
   const pagePathnames = new Set(
     schema.pages.map((p) => {
-      try { return new URL(p.url).pathname.replace(/\/$/, '') || '/' } catch { return p.url }
+      try {
+        return new URL(p.url, base).pathname.replace(/\/$/, '') || '/'
+      } catch {
+        return p.url
+      }
     })
   )
-  const nav = flattenNav(schema.nav, schema.rootUrl)
-    .filter((item) => {
-      try { return pagePathnames.has(new URL(item.url, schema.rootUrl).pathname.replace(/\/$/, '') || '/') }
-      catch { return true }
-    })
-    .slice(0, 7)
+  const nav = buildNav(schema.nav, base, pagePathnames, navMaxItems)
 
   await Promise.all([
     writeFile(join(outputDir, 'package.json'), generatePackageJson(schema)),
@@ -70,8 +78,8 @@ export const generateSite = async (schema: SiteSchema, outputDir: string): Promi
   // 4. One page file per PageSchema
   await Promise.all(
     schema.pages.map(async (page) => {
-      const routePath = urlToRoutePath(page.url)
-      const componentName = urlToComponentName(page.url)
+      const routePath = urlToRoutePath(page.url, base)
+      const componentName = urlToComponentName(page.url, base)
       const pageDir = join(outputDir, dirname(routePath))
       await mkdir(pageDir, { recursive: true })
       await writeFile(join(outputDir, routePath), generatePage(page, componentName))

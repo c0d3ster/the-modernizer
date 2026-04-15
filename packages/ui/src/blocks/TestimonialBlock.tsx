@@ -15,7 +15,7 @@ export const TestimonialBlock = ({ block }: TestimonialBlockProps): React.ReactE
     <section className={cn(section)}>
       <div className={container}>
         {heading && (
-          <h2 className="mb-12 text-center text-3xl font-bold tracking-tight lg:text-4xl">{heading}</h2>
+          <h2 className="mb-12 text-center text-3xl font-bold tracking-tight text-primary lg:text-4xl">{heading}</h2>
         )}
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {testimonials.map((t, i) => (
@@ -25,7 +25,7 @@ export const TestimonialBlock = ({ block }: TestimonialBlockProps): React.ReactE
                 <div className="flex items-center gap-3">
                   <Avatar className="h-9 w-9">
                     {t.avatarUrl && <AvatarImage src={t.avatarUrl} alt={t.author} />}
-                    <AvatarFallback>{t.author.slice(0, 2).toUpperCase()}</AvatarFallback>
+                    <AvatarFallback className="bg-primary text-primary-foreground">{t.author.slice(0, 2).toUpperCase()}</AvatarFallback>
                   </Avatar>
                   <div>
                     <p className="text-sm font-semibold">{t.author}</p>

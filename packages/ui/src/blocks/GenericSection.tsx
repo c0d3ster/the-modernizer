@@ -13,7 +13,7 @@ export const GenericSection = ({ block }: GenericSectionProps): React.ReactEleme
     <section className={cn(section)}>
       <div className={cn(container, 'max-w-3xl')}>
         {heading && (
-          <h2 className="mb-6 text-3xl font-bold tracking-tight lg:text-4xl">{heading}</h2>
+          <h2 className="mb-6 text-3xl font-bold tracking-tight text-primary lg:text-4xl">{heading}</h2>
         )}
         <div
           className="prose prose-lg max-w-none text-muted-foreground"

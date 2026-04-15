@@ -1,8 +1,9 @@
 // Dev script — runs the generator against a saved SiteSchema fixture.
 //
 // Usage:
-//   pnpm --filter @modernizer/generator generate --schema ../extractor/fixtures/site-schema.json
-//   pnpm --filter @modernizer/generator generate --schema C:/path/to/schema.json --out C:/path/to/output
+//   pnpm --filter @modernizer/generator generate
+//   pnpm --filter @modernizer/generator generate --schema packages/extractor/fixtures/edgehill-schema-v5.json
+//   pnpm --filter @modernizer/generator generate --schema <path> --out <dir>
 
 import { readFile } from 'node:fs/promises'
 import { resolve, dirname } from 'node:path'
@@ -11,6 +12,7 @@ import { siteSchemaSchema } from '@modernizer/schema'
 import { generateSite } from '../src/index.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
+const repoRoot = resolve(__dirname, '../../..')
 
 const args = process.argv.slice(2)
 
@@ -21,14 +23,10 @@ const flag = (name: string): string | undefined => {
 
 const schemaArg = flag('--schema')
 const outArg = flag('--out')
-const outPath = outArg ? resolve(outArg) : resolve(__dirname, '../../../.generated')
+const outPath = outArg ? resolve(repoRoot, outArg) : resolve(repoRoot, '.generated')
 
-if (!schemaArg) {
-  console.error('Usage: pnpm --filter @modernizer/generator generate --schema <schema.json> [--out <dir>]')
-  process.exit(1)
-}
-
-const schemaPath = resolve(schemaArg)
+const defaultSchema = resolve(repoRoot, 'packages/extractor/fixtures/edgehill-schema-v5.json')
+const schemaPath = schemaArg ? resolve(repoRoot, schemaArg) : defaultSchema
 console.log(`Loading schema: ${schemaPath}`)
 const raw = await readFile(schemaPath, 'utf-8')
 const parsed: unknown = JSON.parse(raw)

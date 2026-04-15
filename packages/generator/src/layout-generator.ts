@@ -1,35 +1,101 @@
 import type { SiteSchema, BrandColors, NavItem } from '@modernizer/schema'
 
-// Flattens the nav tree into a single level, strips origins from same-site
-// URLs, and skips anchor-only items (#) that have no real destination.
-export const flattenNav = (nav: NavItem[], rootUrl: string): Array<{ label: string; url: string }> => {
-  const origin = new URL(rootUrl).origin
+const toRelative = (url: string, baseUrl: string): string | null => {
+  if (!url || url === '#') return null
+  try {
+    const origin = new URL(baseUrl).origin
+    const parsed = new URL(url, baseUrl)
+    if (parsed.origin === origin) return parsed.pathname.replace(/\/$/, '') || '/'
+    return url
+  } catch {
+    return null
+  }
+}
 
-  const toRelative = (url: string): string | null => {
-    if (!url || url === '#') return null
+const isExternalHref = (href: string, baseUrl: string): boolean => {
+  try {
+    return new URL(href, baseUrl).origin !== new URL(baseUrl).origin
+  } catch {
+    return false
+  }
+}
+
+const MAX_CHILDREN_PER_GROUP = 5
+
+/**
+ * Builds a clean nav tree from the raw schema nav:
+ * - strips homepage (/) from all items — always reachable via the logo
+ * - dedupes children across groups by URL (first occurrence wins)
+ * - same-origin children: only links to crawled pages; external child links are kept as-is
+ * - top-level same-origin links must target a crawled page; external top-level links are kept
+ * - collapses single-child groups into a top-level link (dropdown with one item is just friction)
+ * - caps children per group at MAX_CHILDREN_PER_GROUP
+ * - caps total top-level items at navMaxItems
+ */
+export const buildNav = (nav: NavItem[], rootUrl: string, pagePathnames: Set<string>, navMaxItems: number): NavItem[] => {
+  const origin = new URL(rootUrl).origin
+  const seenUrls = new Set<string>(['/', '']) // pre-seed homepage so it's always excluded
+
+  const processChild = (child: NavItem): NavItem | null => {
+    const childUrl = toRelative(child.url, rootUrl)
+    if (!childUrl) return null
+    let internalPath: string | null = null
     try {
-      const parsed = new URL(url)
-      if (parsed.origin === origin) {
-        return parsed.pathname.replace(/\/$/, '') || '/'
-      }
-      return url // external link — keep as-is
+      const p = new URL(child.url, rootUrl)
+      if (p.origin === origin) internalPath = p.pathname.replace(/\/$/, '') || '/'
     } catch {
-      return url // already relative
+      return null
     }
+    if (internalPath !== null && !pagePathnames.has(internalPath)) return null
+    if (seenUrls.has(childUrl)) return null
+    seenUrls.add(childUrl)
+    return { label: child.label, url: childUrl }
   }
 
+  const processItem = (item: NavItem): NavItem | NavItem[] | null => {
+    const url = toRelative(item.url, rootUrl)
+    const children = item.children
+      ?.map(processChild)
+      .filter((c): c is NavItem => c !== null)
+      .slice(0, MAX_CHILDREN_PER_GROUP)
+
+    const hasRealUrl =
+      !!url &&
+      url !== '#' &&
+      !seenUrls.has(url) &&
+      (pagePathnames.has(url) || isExternalHref(item.url, rootUrl))
+    const hasChildren = children && children.length > 0
+
+    if (!hasRealUrl && !hasChildren) return null
+
+    // Single-child group: keep parent label but link directly to the one child (no dropdown)
+    if (!hasRealUrl && children?.length === 1) return { label: item.label, url: children[0]!.url }
+
+    if (hasRealUrl) seenUrls.add(url)
+
+    const result: NavItem = { label: item.label, url: url ?? '#' }
+    if (hasChildren) result.children = children
+    return result
+  }
+
+  return nav
+    .flatMap((item) => {
+      const result = processItem(item)
+      if (result === null) return []
+      return Array.isArray(result) ? result : [result]
+    })
+    .slice(0, navMaxItems)
+}
+
+/** @deprecated Use buildNav instead — flattenNav destroys hierarchy */
+export const flattenNav = (nav: NavItem[], rootUrl: string): Array<{ label: string; url: string }> => {
   const seen = new Set<string>()
   const result: Array<{ label: string; url: string }> = []
-
   const collect = (item: NavItem): void => {
-    const url = toRelative(item.url)
-    if (url && !seen.has(url)) {
-      seen.add(url)
-      result.push({ label: item.label, url })
-    }
+    const url = toRelative(item.url, rootUrl)
+    if (url && !seen.has(url)) { seen.add(url); result.push({ label: item.label, url }) }
     item.children?.forEach(collect)
   }
-
   nav.forEach(collect)
   return result
 }
@@ -43,16 +109,15 @@ export const generateLayout = (schema: SiteSchema): string => {
   const navMaxItems = schema.generator?.navMaxItems ?? 7
   const pagePathnames = new Set(
     pages.map((p) => {
-      try { return new URL(p.url).pathname.replace(/\/$/, '') || '/' } catch { return p.url }
+      try {
+        return new URL(p.url, rootUrl).pathname.replace(/\/$/, '') || '/'
+      } catch {
+        return p.url
+      }
     })
   )
-  const flatNav = flattenNav(nav, rootUrl)
-    .filter((item) => {
-      try { return pagePathnames.has(new URL(item.url, rootUrl).pathname.replace(/\/$/, '') || '/') }
-      catch { return true } // keep external links
-    })
-    .slice(0, navMaxItems)
-  const navLiteral = JSON.stringify(flatNav, null, 2)
+  const builtNav = buildNav(nav, rootUrl, pagePathnames, navMaxItems)
+  const navLiteral = JSON.stringify(builtNav, null, 2)
   const description = tagline ?? siteName
 
   const footerProps: string[] = []
