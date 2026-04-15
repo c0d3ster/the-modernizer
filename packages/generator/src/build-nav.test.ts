@@ -112,3 +112,14 @@ describe('buildNav (Edgehill)', () => {
     childUrls.forEach((url) => expect(url).not.toContain('https://'))
   })
 })
+
+describe('buildNav (external top-level)', () => {
+  const nav: NavItem[] = [{ label: 'Partner', url: 'https://example.org/partner' }]
+  const crawled = new Set(['/local-only'])
+
+  it('keeps external top-level links that are not in the crawled set', () => {
+    const result = buildNav(nav, 'https://mysite.com/', crawled, 7)
+    expect(result).toHaveLength(1)
+    expect(result[0]).toEqual({ label: 'Partner', url: 'https://example.org/partner' })
+  })
+})

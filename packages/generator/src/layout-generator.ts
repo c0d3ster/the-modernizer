@@ -1,13 +1,22 @@
 import type { SiteSchema, BrandColors, NavItem } from '@modernizer/schema'
 
-const toRelative = (url: string, origin: string): string | null => {
+const toRelative = (url: string, baseUrl: string): string | null => {
   if (!url || url === '#') return null
   try {
-    const parsed = new URL(url)
+    const origin = new URL(baseUrl).origin
+    const parsed = new URL(url, baseUrl)
     if (parsed.origin === origin) return parsed.pathname.replace(/\/$/, '') || '/'
     return url
   } catch {
-    return url
+    return null
+  }
+}
+
+const isExternalHref = (href: string, baseUrl: string): boolean => {
+  try {
+    return new URL(href, baseUrl).origin !== new URL(baseUrl).origin
+  } catch {
+    return false
   }
 }
 
@@ -17,7 +26,8 @@ const MAX_CHILDREN_PER_GROUP = 5
  * Builds a clean nav tree from the raw schema nav:
  * - strips homepage (/) from all items — always reachable via the logo
  * - dedupes children across groups by URL (first occurrence wins)
- * - filters children to only crawled pages
+ * - same-origin children: only links to crawled pages; external child links are kept as-is
+ * - top-level same-origin links must target a crawled page; external top-level links are kept
  * - collapses single-child groups into a top-level link (dropdown with one item is just friction)
  * - caps children per group at MAX_CHILDREN_PER_GROUP
  * - caps total top-level items at navMaxItems
@@ -27,23 +37,33 @@ export const buildNav = (nav: NavItem[], rootUrl: string, pagePathnames: Set<str
   const seenUrls = new Set<string>(['/', '']) // pre-seed homepage so it's always excluded
 
   const processChild = (child: NavItem): NavItem | null => {
-    const childUrl = toRelative(child.url, origin)
+    const childUrl = toRelative(child.url, rootUrl)
     if (!childUrl) return null
-    const isInternal = (() => { try { return new URL(child.url).origin === origin } catch { return false } })()
-    if (isInternal && !pagePathnames.has(new URL(child.url).pathname.replace(/\/$/, '') || '/')) return null
+    let internalPath: string | null = null
+    try {
+      const p = new URL(child.url, rootUrl)
+      if (p.origin === origin) internalPath = p.pathname.replace(/\/$/, '') || '/'
+    } catch {
+      return null
+    }
+    if (internalPath !== null && !pagePathnames.has(internalPath)) return null
     if (seenUrls.has(childUrl)) return null
     seenUrls.add(childUrl)
     return { label: child.label, url: childUrl }
   }
 
   const processItem = (item: NavItem): NavItem | NavItem[] | null => {
-    const url = toRelative(item.url, origin)
+    const url = toRelative(item.url, rootUrl)
     const children = item.children
       ?.map(processChild)
       .filter((c): c is NavItem => c !== null)
       .slice(0, MAX_CHILDREN_PER_GROUP)
 
-    const hasRealUrl = url && url !== '#' && !seenUrls.has(url) && pagePathnames.has(url)
+    const hasRealUrl =
+      !!url &&
+      url !== '#' &&
+      !seenUrls.has(url) &&
+      (pagePathnames.has(url) || isExternalHref(item.url, rootUrl))
     const hasChildren = children && children.length > 0
 
     if (!hasRealUrl && !hasChildren) return null
@@ -69,11 +89,10 @@ export const buildNav = (nav: NavItem[], rootUrl: string, pagePathnames: Set<str
 
 /** @deprecated Use buildNav instead — flattenNav destroys hierarchy */
 export const flattenNav = (nav: NavItem[], rootUrl: string): Array<{ label: string; url: string }> => {
-  const origin = new URL(rootUrl).origin
   const seen = new Set<string>()
   const result: Array<{ label: string; url: string }> = []
   const collect = (item: NavItem): void => {
-    const url = toRelative(item.url, origin)
+    const url = toRelative(item.url, rootUrl)
     if (url && !seen.has(url)) { seen.add(url); result.push({ label: item.label, url }) }
     item.children?.forEach(collect)
   }
@@ -90,7 +109,11 @@ export const generateLayout = (schema: SiteSchema): string => {
   const navMaxItems = schema.generator?.navMaxItems ?? 7
   const pagePathnames = new Set(
     pages.map((p) => {
-      try { return new URL(p.url).pathname.replace(/\/$/, '') || '/' } catch { return p.url }
+      try {
+        return new URL(p.url, rootUrl).pathname.replace(/\/$/, '') || '/'
+      } catch {
+        return p.url
+      }
     })
   )
   const builtNav = buildNav(nav, rootUrl, pagePathnames, navMaxItems)

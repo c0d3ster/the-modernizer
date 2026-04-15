@@ -30,18 +30,21 @@ const DesktopDropdown = ({ item }: { item: NavItem }): React.ReactElement => {
   }
 
   return (
-    <div className="group relative">
-      <button
-        type="button"
-        className="flex items-center gap-1 text-sm text-primary-foreground/85 transition-colors hover:text-primary-foreground"
-      >
-        {linkHref ? (
-          <a href={linkHref}>{item.label}</a>
-        ) : (
-          item.label
-        )}
-        <ChevronDown className="h-3.5 w-3.5 transition-transform group-hover:rotate-180" />
-      </button>
+    <div className="group relative flex items-center gap-1">
+      {linkHref ? (
+        <a
+          href={linkHref}
+          className="text-sm text-primary-foreground/85 transition-colors hover:text-primary-foreground"
+        >
+          {item.label}
+        </a>
+      ) : (
+        <span className="text-sm text-primary-foreground/85">{item.label}</span>
+      )}
+      <ChevronDown
+        className="h-3.5 w-3.5 transition-transform group-hover:rotate-180"
+        aria-hidden
+      />
       <div className="invisible absolute left-0 top-full z-50 mt-1 min-w-[180px] rounded-md border border-border bg-card py-1 shadow-lg opacity-0 transition-all group-hover:visible group-hover:opacity-100">
         {item.children!.map((child) => (
           <a

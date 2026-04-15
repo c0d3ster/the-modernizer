@@ -83,9 +83,10 @@ const SELF_COLORED_BLOCKS = new Set(['hero', 'cta', 'stats'])
 
 const blockToJsx = (block: ContentBlock, alt: boolean): string => {
   const component = blockTypeToComponent(block.type)
-  const inner = `      <${component} block={${serializeValue(block, 2)}} />`
-  if (!alt) return inner
-  return `      <div className="bg-muted/40">\n  ${inner}\n      </div>`
+  const blockLine = `<${component} block={${serializeValue(block, 2)}} />`
+  const baseIndent = '      '
+  if (!alt) return `${baseIndent}${blockLine}`
+  return `${baseIndent}<div className="bg-muted/40">\n${baseIndent}  ${blockLine}\n${baseIndent}</div>`
 }
 
 export const generatePage = (page: PageSchema, componentName: string): string => {

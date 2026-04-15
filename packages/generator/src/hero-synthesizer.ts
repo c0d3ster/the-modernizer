@@ -7,10 +7,10 @@ import { PageArchetype } from '@modernizer/schema'
  */
 const SAMPLE_HERO_URL = '/sample-hero.jpg'
 
-const findFirstCtaPage = (pages: PageSchema[]): string | undefined =>
+const findFirstCtaPage = (pages: PageSchema[], rootUrl: string): string | undefined =>
   pages.find((p) => {
     try {
-      const path = new URL(p.url).pathname.replace(/\/$/, '') || '/'
+      const path = new URL(p.url, rootUrl).pathname.replace(/\/$/, '') || '/'
       return path !== '/' && (
         p.archetype === PageArchetype.Contact ||
         p.archetype === PageArchetype.Services
@@ -21,7 +21,7 @@ const findFirstCtaPage = (pages: PageSchema[]): string | undefined =>
 const toRelativePath = (url: string, rootUrl: string): string => {
   try {
     const origin = new URL(rootUrl).origin
-    const parsed = new URL(url)
+    const parsed = new URL(url, rootUrl)
     if (parsed.origin === origin) return parsed.pathname.replace(/\/$/, '') || '/'
   } catch { /* ignore */ }
   return url
@@ -35,8 +35,15 @@ const toRelativePath = (url: string, rootUrl: string): string => {
 export const synthesizePageHeaders = (schema: SiteSchema): SiteSchema => {
   if (schema.generator?.noHero) return schema
 
+  const rootUrl = schema.rootUrl
   const pages = schema.pages.map((page) => {
-    const isHome = (() => { try { return (new URL(page.url).pathname.replace(/\/$/, '') || '/') === '/' } catch { return false } })()
+    const isHome = (() => {
+      try {
+        return (new URL(page.url, rootUrl).pathname.replace(/\/$/, '') || '/') === '/'
+      } catch {
+        return false
+      }
+    })()
     if (isHome) return page
     if (page.blocks[0]?.type === 'hero') return page
 
@@ -65,9 +72,13 @@ export const synthesizePageHeaders = (schema: SiteSchema): SiteSchema => {
 export const synthesizeHero = (schema: SiteSchema): SiteSchema => {
   if (schema.generator?.noHero) return schema
 
+  const rootUrl = schema.rootUrl
   const homeIndex = schema.pages.findIndex((p) => {
-    try { return (new URL(p.url).pathname.replace(/\/$/, '') || '/') === '/' }
-    catch { return false }
+    try {
+      return (new URL(p.url, rootUrl).pathname.replace(/\/$/, '') || '/') === '/'
+    } catch {
+      return false
+    }
   })
 
   if (homeIndex === -1) return schema
@@ -81,7 +92,7 @@ export const synthesizeHero = (schema: SiteSchema): SiteSchema => {
     .find((b): b is HeroBlock => b.type === 'hero' && !!b.backgroundImageUrl)
     ?.backgroundImageUrl
 
-  const ctaPage = findFirstCtaPage(schema.pages)
+  const ctaPage = findFirstCtaPage(schema.pages, rootUrl)
 
   const hero: HeroBlock = {
     type: 'hero',

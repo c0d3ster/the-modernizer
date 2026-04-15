@@ -46,8 +46,8 @@ export const generateReport = (
 
   const pageRows = pages
     .map((p) => {
-      const route = urlToRoutePath(p.url)
-      const component = urlToComponentName(p.url)
+      const route = urlToRoutePath(p.url, rootUrl)
+      const component = urlToComponentName(p.url, rootUrl)
       const blockSummary = p.blocks.map((b) => blockTypeLabel[b.type] ?? b.type).join(', ')
       const titleCell = mdTableCell(String(p.title ?? p.url))
       return `| ${titleCell} | \`${route}\` | \`${component}\` | ${mdTableCell(blockSummary)} |`
