@@ -3,9 +3,10 @@ import { staticFetch } from './static-fetcher.js'
 import { extractImages, extractLinks, extractTitle } from './link-extractor.js'
 import { fetchDisallowedPaths, isAllowed } from './robots.js'
 import { normalizeUrl } from './url-utils.js'
-import type { CrawlOptions, CrawlResult } from './types.js'
+import type { CrawlOptions } from './types.js'
+import type { CrawlResult } from '@modernizer/schema'
 
-const DEFAULT_OPTIONS: Required<CrawlOptions> = {
+const DEFAULT_OPTIONS: Required<Omit<CrawlOptions, 'onPageCrawled'>> = {
   maxPages: 100,
   maxDepth: 3,
   concurrency: 3,
@@ -72,7 +73,7 @@ export const crawl = async (
 
           if (results.length >= opts.maxPages) return
 
-          results.push({
+          const crawlResult: CrawlResult = {
             url,
             finalUrl,
             title: extractTitle(html),
@@ -83,7 +84,9 @@ export const crawl = async (
             assets: [],
             internalLinks,
             crawledAt: new Date().toISOString(),
-          })
+          }
+          results.push(crawlResult)
+          opts.onPageCrawled?.(crawlResult, results.length)
 
           for (const link of internalLinks) {
             if (!visited.has(link)) {

@@ -7,7 +7,7 @@ const getBrowser = async (): Promise<Browser> => {
   if (browser?.isConnected()) return browser
   if (launching) return launching
 
-  launching = chromium.launch({ headless: true }).then((b) => {
+  launching = chromium.launch({ headless: false }).then((b) => {
     browser = b
     launching = null
     return b
