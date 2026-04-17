@@ -6,9 +6,12 @@ import { writeFile, mkdir, readFile } from 'node:fs/promises'
 import { resolve, join } from 'node:path'
 import { Command } from 'commander'
 import { crawl } from '@modernizer/crawler'
-import { extract } from '@modernizer/extractor'
+import { extract, getUsageStats } from '@modernizer/extractor'
 import { generateSite } from '@modernizer/generator'
 import { siteSchemaSchema } from '@modernizer/schema'
+
+const slugify = (name: string): string =>
+  name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
 
 const program = new Command()
 
@@ -17,24 +20,28 @@ program
   .description('Crawl an outdated website and regenerate it as a modern Next.js app')
   .version('0.0.0')
   .argument('[url]', 'URL of the site to modernize')
-  .option('-o, --output <dir>', 'output directory', './modernized')
+  .option('-o, --output <dir>', 'output directory (defaults to .generated/<site-slug>)')
   .option('--max-pages <n>', 'maximum pages to crawl', '100')
   .option('--max-depth <n>', 'maximum crawl depth', '3')
   .option('--schema-only', 'stop after extraction and write SiteSchema JSON', false)
   .option('--from-schema <file>', 'skip crawl/extract and generate from a saved schema JSON')
   .option('--primary-color <hex>', 'override auto-detected brand color (e.g. #2563eb)')
   .option('--verbose', 'detailed logging', false)
+  .option(
+    '--headless',
+    'use headless Chromium for Playwright fallback (CI, Docker); default is headful. Env MODERNIZER_HEADLESS=true also enables headless',
+  )
 
 program.action(async (url: string | undefined, opts: {
-  output: string
+  output?: string
   maxPages: string
   maxDepth: string
   schemaOnly: boolean
   fromSchema?: string
   primaryColor?: string
   verbose: boolean
+  headless?: boolean
 }) => {
-  const outputDir = resolve(opts.output)
   const verbose = opts.verbose
   const log = (msg: string): void => { process.stdout.write(msg + '\n') }
   const debug = (msg: string): void => { if (verbose) process.stdout.write('  ' + msg + '\n') }
@@ -51,11 +58,12 @@ program.action(async (url: string | undefined, opts: {
         schema = { ...schema, brandColors: { ...schema.brandColors, primary: opts.primaryColor } }
       }
 
+      const outDir = resolve(opts.output ?? join('.generated', slugify(schema.siteName)))
       log(`Generating: ${schema.siteName} (${schema.pages.length} pages)`)
-      await mkdir(outputDir, { recursive: true })
-      await generateSite(schema, outputDir)
-      log(`\nDone! Output: ${outputDir}`)
-      log(`  cd ${outputDir} && npm install && npm run dev`)
+      await mkdir(outDir, { recursive: true })
+      await generateSite(schema, outDir)
+      log(`\nDone! Output: ${outDir}`)
+      log(`  cd ${outDir} && npm install && npm run dev`)
       return
     }
 
@@ -69,6 +77,7 @@ program.action(async (url: string | undefined, opts: {
     const pages = await crawl(url, {
       maxPages,
       maxDepth: parseInt(opts.maxDepth, 10),
+      ...(opts.headless ? { playwrightHeadless: true } : {}),
       onPageCrawled: (result, total) => {
         process.stdout.write(`\r  Crawled ${total} / ${maxPages}: ${result.title || result.url}`.padEnd(80))
       },
@@ -80,16 +89,19 @@ program.action(async (url: string | undefined, opts: {
     // ── Stage 2: extract ───────────────────────────────────────────────────
     log(`Extracting content...`)
     let schema = await extract(pages)
-    log(`  Extracted ${schema.pages.length} pages`)
+    const stats = getUsageStats()
+    log(`  Extracted ${schema.pages.length} pages — ${stats.calls} LLM calls, ${stats.inputTokens + stats.outputTokens} tokens, ~$${stats.estimatedCostUsd.toFixed(4)}`)
 
     if (opts.primaryColor) {
       schema = { ...schema, brandColors: { ...schema.brandColors, primary: opts.primaryColor } }
     }
 
+    const outDir = resolve(opts.output ?? join('.generated', slugify(schema.siteName)))
+
     // ── Schema-only mode ───────────────────────────────────────────────────
     if (opts.schemaOnly) {
-      await mkdir(outputDir, { recursive: true })
-      const schemaPath = join(outputDir, 'schema.json')
+      await mkdir(outDir, { recursive: true })
+      const schemaPath = join(outDir, 'schema.json')
       await writeFile(schemaPath, JSON.stringify(schema, null, 2))
       log(`\nSchema written to ${schemaPath}`)
       return
@@ -97,11 +109,11 @@ program.action(async (url: string | undefined, opts: {
 
     // ── Stage 3: generate ──────────────────────────────────────────────────
     log(`Generating site...`)
-    await mkdir(outputDir, { recursive: true })
-    await generateSite(schema, outputDir)
+    await mkdir(outDir, { recursive: true })
+    await generateSite(schema, outDir)
 
-    log(`\nDone! Output: ${outputDir}`)
-    log(`  cd ${outputDir} && npm install && npm run dev`)
+    log(`\nDone! Output: ${outDir}`)
+    log(`  cd ${outDir} && npm install && npm run dev`)
   } catch (err) {
     process.stderr.write(`\nError: ${err instanceof Error ? err.message : String(err)}\n`)
     if (verbose && err instanceof Error && err.stack) {
