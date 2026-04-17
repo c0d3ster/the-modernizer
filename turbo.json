@@ -1,6 +1,7 @@
 {
   "$schema": "https://turborepo.dev/schema.json",
   "ui": "tui",
+  "globalEnv": ["MODERNIZER_HEADLESS"],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],

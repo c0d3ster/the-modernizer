@@ -19,4 +19,9 @@ export interface CrawlOptions {
   concurrency?: number
   delayMs?: number
   respectRobotsTxt?: boolean
+  /**
+   * When true, run Playwright’s Chromium in headless mode (CI, Docker, SSH).
+   * When omitted, uses boolean env MODERNIZER_HEADLESS; defaults to headful (false).
+   */
+  playwrightHeadless?: boolean
 }

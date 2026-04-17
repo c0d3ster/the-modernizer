@@ -1,11 +1,12 @@
-import { playwrightFetch, closeBrowser } from './playwright-fetcher.js'
+import { playwrightFetch, closeBrowser, resolvePlaywrightHeadless } from './playwright-fetcher.js'
 import { staticFetch } from './static-fetcher.js'
 import { extractImages, extractLinks, extractTitle } from './link-extractor.js'
 import { fetchDisallowedPaths, isAllowed } from './robots.js'
 import { normalizeUrl } from './url-utils.js'
-import type { CrawlOptions, CrawlResult } from './types.js'
+import type { CrawlOptions } from './types.js'
+import type { CrawlResult } from '@modernizer/schema'
 
-const DEFAULT_OPTIONS: Required<CrawlOptions> = {
+const DEFAULT_OPTIONS: Required<Omit<CrawlOptions, 'onPageCrawled' | 'playwrightHeadless'>> = {
   maxPages: 100,
   maxDepth: 3,
   concurrency: 3,
@@ -16,16 +17,6 @@ const DEFAULT_OPTIONS: Required<CrawlOptions> = {
 const delay = (ms: number): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, ms))
 
-const fetchPage = async (url: string): Promise<{ html: string; statusCode: number; finalUrl: string; fetchMethod: 'static' | 'playwright' } | null> => {
-  const staticResult = await staticFetch(url)
-  if (staticResult) return { ...staticResult, fetchMethod: 'static' }
-
-  const playwrightResult = await playwrightFetch(url)
-  if (playwrightResult) return { ...playwrightResult, fetchMethod: 'playwright' }
-
-  return null
-}
-
 export const crawl = async (
   seedUrl: string,
   options: CrawlOptions = {}
@@ -35,6 +26,18 @@ export const crawl = async (
     ...options,
     concurrency: Math.max(1, options.concurrency ?? DEFAULT_OPTIONS.concurrency),
   }
+  const playwrightHeadless = resolvePlaywrightHeadless(options.playwrightHeadless)
+
+  const fetchPage = async (url: string): Promise<{ html: string; statusCode: number; finalUrl: string; fetchMethod: 'static' | 'playwright' } | null> => {
+    const staticResult = await staticFetch(url)
+    if (staticResult) return { ...staticResult, fetchMethod: 'static' }
+
+    const playwrightResult = await playwrightFetch(url, { headless: playwrightHeadless })
+    if (playwrightResult) return { ...playwrightResult, fetchMethod: 'playwright' }
+
+    return null
+  }
+
   const rootUrl = normalizeUrl(seedUrl)
 
   const disallowedPaths = opts.respectRobotsTxt
@@ -72,7 +75,7 @@ export const crawl = async (
 
           if (results.length >= opts.maxPages) return
 
-          results.push({
+          const crawlResult: CrawlResult = {
             url,
             finalUrl,
             title: extractTitle(html),
@@ -83,7 +86,9 @@ export const crawl = async (
             assets: [],
             internalLinks,
             crawledAt: new Date().toISOString(),
-          })
+          }
+          results.push(crawlResult)
+          opts.onPageCrawled?.(crawlResult, results.length)
 
           for (const link of internalLinks) {
             if (!visited.has(link)) {
