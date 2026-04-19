@@ -9,6 +9,7 @@ import { splitBlocks } from './block-splitter.js'
 import { classifyBlocks } from './block-classifier.js'
 import { extractSiteData } from './site-extractor.js'
 import { extractCandidateColors } from './color-extractor.js'
+import { fetchLinkedCss } from './css-fetcher.js'
 import type { CrawlResult } from '@modernizer/schema'
 
 export interface ExtractOptions {
@@ -38,8 +39,11 @@ export const extract = async (
     uniqueResults.map((r) => ({ url: r.url, rawHtml: r.rawHtml }))
   )
 
-  // --- deterministic: extract color candidates from all raw HTML ---
-  const colorCandidates = extractCandidateColors(uniqueResults)
+  // --- deterministic: fetch external CSS + extract color candidates ---
+  const externalCss = await fetchLinkedCss(
+    uniqueResults.map((r) => ({ rawHtml: r.rawHtml, url: r.finalUrl || r.url }))
+  )
+  const colorCandidates = extractCandidateColors(uniqueResults, externalCss)
 
   // --- LLM: site-level data from chrome (1 call) ---
   const siteData = await extractSiteData(chromeHtml, rootUrl, colorCandidates)
