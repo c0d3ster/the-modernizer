@@ -4,6 +4,12 @@ const HEX_RE = /#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})\b/g
 const WP_COLOR_RE = /--wp--preset--color--([a-z0-9-]+):\s*(#[0-9a-fA-F]{3,6})/g
 const HAS_COLOR_CLASS_RE = /has-([a-z0-9-]+)-(background-color|color)\b/g
 
+// CSS custom property names that strongly suggest a brand/primary color.
+// Matches: --primary, --primary-color, --color-primary, --brand-color,
+//          --accent, --accent-color, --theme-color, --main-color, --highlight-color
+const BRAND_CSS_VAR_RE =
+  /--(?:color-)?(?:primary|brand|accent|theme|main|highlight)(?:-color|-bg|-background)?:\s*(#[0-9a-fA-F]{3,8})/gi
+
 // The standard Gutenberg default palette — present on every WordPress site,
 // so these hex values alone are meaningless as brand signals.
 const WP_DEFAULT_PALETTE = new Set([
@@ -25,7 +31,7 @@ const normalize = (hex: string): string => {
 }
 
 export interface ColorCandidate {
-  // Human-readable label, e.g. "vivid-red" or "inline-style"
+  // Human-readable label, e.g. "vivid-red" or "css-var-primary"
   label: string
   hex: string
   // Higher = more likely to be a brand color
@@ -33,32 +39,41 @@ export interface ColorCandidate {
 }
 
 /**
- * Extracts brand color candidates from crawled HTML pages.
+ * Extracts brand color candidates from crawled HTML pages and optional external CSS.
  *
- * Three signal sources ranked by reliability:
+ * Signal sources ranked by reliability:
  *
- * 1. WordPress `has-X-background-color` classes on content blocks — the site
- *    editor explicitly chose this color, highest confidence.
- * 2. WP preset colors (--wp--preset--color--*) with names — passed with names
- *    so the LLM can reason about "vivid-red" vs "vivid-green-cyan".
- * 3. Non-WP-default inline style hex values — any remaining inline color usage.
- *
- * Note: colors in external .css files are not available without fetching them.
- * For sites whose brand colors are applied only via external CSS (common with
- * Genesis/classic themes), this will return WP preset candidates with names
- * and rely on the LLM to pick the most plausible one.
+ * 1. `<meta name="theme-color">` — explicit per-site browser chrome color, highest confidence
+ * 2. WordPress `has-X-background-color` classes on content blocks — editor explicitly chose this
+ * 3. Brand-named CSS custom properties (--primary, --brand-color, --accent, etc.) in external CSS
+ * 4. WP preset colors (--wp--preset--color--*) with names — passed with names so the LLM
+ *    can reason about "vivid-red" vs "vivid-green-cyan"
+ * 5. Frequency-ranked hex values from external CSS files
+ * 6. Non-WP-default inline style hex values
  */
 export const extractCandidateColors = (
   pages: Array<{ rawHtml: string }>,
+  externalCss: string[] = [],
 ): ColorCandidate[] => {
   const blockColorCounts = new Map<string, number>() // slug → count
   const wpPresetColors = new Map<string, string>()   // slug → hex
   const inlineColors = new Map<string, number>()     // hex → count
+  const themeColors: string[] = []
 
   for (const { rawHtml } of pages) {
     const $ = cheerio.load(rawHtml)
 
-    // --- Signal 1: has-X-background-color class usage on blocks ---
+    // --- Signal 1: <meta name="theme-color"> — explicit brand signal ---
+    $('meta[name="theme-color"]').each((_, el) => {
+      const content = $(el).attr('content') ?? ''
+      const match = content.match(/#[0-9a-fA-F]{3,8}/)
+      if (match) {
+        const hex = normalize(match[0])
+        if (!IGNORED_GENERIC.has(hex)) themeColors.push(hex)
+      }
+    })
+
+    // --- Signal 2: has-X-background-color class usage on blocks ---
     $('[class*="has-"][class*="-background-color"]').each((_, el) => {
       const cls = $(el).attr('class') ?? ''
       for (const match of cls.matchAll(HAS_COLOR_CLASS_RE)) {
@@ -69,7 +84,7 @@ export const extractCandidateColors = (
       }
     })
 
-    // --- Signal 2: WP preset color variables (first page wins for names) ---
+    // --- Signal 4: WP preset color variables (first page wins for names) ---
     $('style').each((_, el) => {
       const css = $(el).text()
       for (const match of css.matchAll(WP_COLOR_RE)) {
@@ -81,7 +96,7 @@ export const extractCandidateColors = (
       }
     })
 
-    // --- Signal 3: non-default inline style hex values ---
+    // --- Signal 6: non-default inline style hex values ---
     $('[style]').each((_, el) => {
       const style = $(el).attr('style') ?? ''
       for (const match of style.matchAll(HEX_RE)) {
@@ -93,33 +108,73 @@ export const extractCandidateColors = (
     })
   }
 
-  const results: ColorCandidate[] = []
+  // --- Signal 3: brand-named CSS vars in external CSS files ---
+  const brandCssVarColors: string[] = []
+  // --- Signal 5: frequency-ranked hex values from external CSS ---
+  const externalCssColors = new Map<string, number>() // hex → count
 
-  // Signal 1: block background color class usage → high confidence
-  // Resolve the slug back to a hex via WP preset map
-  for (const [slug] of [...blockColorCounts.entries()].sort((a, b) => b[1] - a[1])) {
-    const hex = wpPresetColors.get(slug)
-    if (hex && !IGNORED_GENERIC.has(hex)) {
-      results.push({ label: slug, hex, confidence: 'high' })
+  for (const css of externalCss) {
+    // brand-named CSS custom properties
+    for (const match of css.matchAll(BRAND_CSS_VAR_RE)) {
+      const hex = normalize(match[1]!)
+      if (!IGNORED_GENERIC.has(hex) && !WP_DEFAULT_PALETTE.has(hex)) {
+        brandCssVarColors.push(hex)
+      }
     }
-  }
 
-  // Signal 2: WP preset colors with names → medium confidence
-  // Exclude white/black/grey slugs that are clearly not brand colors
-  const greyishSlugs = new Set(['black', 'white', 'cyan-bluish-gray', 'pale-pink'])
-  for (const [slug, hex] of wpPresetColors) {
-    if (!greyishSlugs.has(slug) && !IGNORED_GENERIC.has(hex)) {
-      if (!results.some((r) => r.hex === hex)) {
-        results.push({ label: slug, hex, confidence: 'medium' })
+    // all hex values in the external CSS for frequency ranking
+    for (const match of css.matchAll(HEX_RE)) {
+      const hex = normalize(match[0])
+      if (!IGNORED_GENERIC.has(hex) && !WP_DEFAULT_PALETTE.has(hex)) {
+        externalCssColors.set(hex, (externalCssColors.get(hex) ?? 0) + 1)
       }
     }
   }
 
-  // Signal 3: non-default inline style colors → low confidence
-  for (const [hex] of [...inlineColors.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5)) {
-    if (!results.some((r) => r.hex === hex)) {
-      results.push({ label: 'inline-style', hex, confidence: 'low' })
+  const results: ColorCandidate[] = []
+  const seen = new Set<string>()
+
+  const push = (c: ColorCandidate): void => {
+    if (!seen.has(c.hex)) {
+      seen.add(c.hex)
+      results.push(c)
     }
+  }
+
+  // Signal 1: theme-color meta
+  for (const hex of themeColors) {
+    push({ label: 'theme-color-meta', hex, confidence: 'high' })
+  }
+
+  // Signal 2: block background color class usage → high confidence
+  for (const [slug] of [...blockColorCounts.entries()].sort((a, b) => b[1] - a[1])) {
+    const hex = wpPresetColors.get(slug)
+    if (hex && !IGNORED_GENERIC.has(hex)) {
+      push({ label: slug, hex, confidence: 'high' })
+    }
+  }
+
+  // Signal 3: brand-named CSS vars → high confidence
+  for (const hex of brandCssVarColors) {
+    push({ label: 'css-var-brand', hex, confidence: 'high' })
+  }
+
+  // Signal 4: WP preset colors with names → medium confidence
+  const greyishSlugs = new Set(['black', 'white', 'cyan-bluish-gray', 'pale-pink'])
+  for (const [slug, hex] of wpPresetColors) {
+    if (!greyishSlugs.has(slug) && !IGNORED_GENERIC.has(hex)) {
+      push({ label: slug, hex, confidence: 'medium' })
+    }
+  }
+
+  // Signal 5: frequency-ranked external CSS hex values → medium confidence
+  for (const [hex] of [...externalCssColors.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8)) {
+    push({ label: 'external-css', hex, confidence: 'medium' })
+  }
+
+  // Signal 6: non-default inline style colors → low confidence
+  for (const [hex] of [...inlineColors.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5)) {
+    push({ label: 'inline-style', hex, confidence: 'low' })
   }
 
   return results
