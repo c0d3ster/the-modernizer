@@ -16,6 +16,7 @@ import {
   generatePostcss,
   generatePrettier,
   generateEslint,
+  collectImageHostnames,
 } from './config-generator.js'
 
 /** Files in `packages/generator/sample-assets/` are copied to `<output>/public/` (Next.js static URL root). */
@@ -60,7 +61,7 @@ export const generateSite = async (schema: SiteSchema, outputDir: string): Promi
 
   await Promise.all([
     writeFile(join(outputDir, 'package.json'), generatePackageJson(schema)),
-    writeFile(join(outputDir, 'next.config.ts'), generateNextConfig()),
+    writeFile(join(outputDir, 'next.config.ts'), generateNextConfig(collectImageHostnames(schema))),
     writeFile(join(outputDir, 'tsconfig.json'), generateTsConfig()),
     writeFile(join(outputDir, 'postcss.config.mjs'), generatePostcss()),
     writeFile(join(outputDir, 'prettier.config.mjs'), generatePrettier()),
