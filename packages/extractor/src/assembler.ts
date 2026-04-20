@@ -63,6 +63,7 @@ export const extract = async (
       title: metadata.title,
       archetype,
       ...(metadata.metaDescription && { metaDescription: metadata.metaDescription }),
+      ...(metadata.ogImage && { ogImage: metadata.ogImage }),
       blocks,
     })
   }

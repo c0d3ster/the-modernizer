@@ -19,5 +19,6 @@ export interface PageSchema {
   title: string
   archetype: PageArchetype
   metaDescription?: string
+  ogImage?: string
   blocks: ContentBlock[]
 }

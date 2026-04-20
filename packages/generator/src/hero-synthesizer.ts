@@ -86,11 +86,19 @@ export const synthesizeHero = (schema: SiteSchema): SiteSchema => {
   const home = schema.pages[homeIndex]!
   if (home.blocks[0]?.type === 'hero') return schema
 
-  // Use an existing extracted background image from anywhere in the site if available
-  const extractedBg = schema.pages
-    .flatMap((p) => p.blocks)
-    .find((b): b is HeroBlock => b.type === 'hero' && !!b.backgroundImageUrl)
-    ?.backgroundImageUrl
+  // Preference order for background image:
+  // 1. An already-extracted hero block with a real image URL (from another page)
+  // 2. The homepage's og:image (curated representative image the site provides)
+  // 3. Any page's og:image
+  // 4. Sample fallback
+  const extractedBg =
+    schema.pages
+      .flatMap((p) => p.blocks)
+      .find((b): b is HeroBlock => b.type === 'hero' && !!b.backgroundImageUrl)
+      ?.backgroundImageUrl ??
+    home.ogImage ??
+    schema.pages.find((p) => p.ogImage)?.ogImage ??
+    SAMPLE_HERO_URL
 
   const ctaPage = findFirstCtaPage(schema.pages, rootUrl)
 
@@ -100,7 +108,7 @@ export const synthesizeHero = (schema: SiteSchema): SiteSchema => {
     subheading: schema.tagline,
     ctaText: ctaPage ? 'Get in touch' : undefined,
     ctaUrl: ctaPage ? toRelativePath(ctaPage, schema.rootUrl) : undefined,
-    backgroundImageUrl: extractedBg ?? SAMPLE_HERO_URL,
+    backgroundImageUrl: extractedBg,
   }
 
   const updatedHome: PageSchema = {
