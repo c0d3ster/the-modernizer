@@ -174,6 +174,7 @@ export const pageSchemaSchema = z.object({
   title: z.string(),
   archetype: pageArchetypeSchema,
   metaDescription: z.string().optional(),
+  ogImage: z.string().optional(),
   blocks: z.array(contentBlockSchema),
 })
 
