@@ -12,6 +12,7 @@ export const heroBlockSchema = z.object({
   ctaText: z.string().optional(),
   ctaUrl: z.string().optional(),
   backgroundImageUrl: z.string().optional(),
+  compact: z.boolean().optional(),
 })
 
 export const textSectionBlockSchema = z.object({
