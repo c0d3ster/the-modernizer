@@ -51,6 +51,7 @@ export const synthesizePageHeaders = (schema: SiteSchema): SiteSchema => {
       type: 'hero',
       heading: page.title,
       subheading: page.metaDescription,
+      compact: true,
     }
 
     return { ...page, blocks: [header, ...page.blocks] }

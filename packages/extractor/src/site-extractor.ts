@@ -51,12 +51,31 @@ export const extractSiteData = async (
   }
   const validated = result.data
 
+  // If the LLM returned no brand colors or fell back to generic blue, use the
+  // top color candidate instead. The extractor has already ranked candidates by
+  // confidence so the first entry is the most reliable signal we have.
+  const FALLBACK_BLUE = '`#2563eb`'
+  const isFallbackBlue = (hex?: string): boolean => hex?.toLowerCase() === FALLBACK_BLUE
+  const topCandidate = colorCandidates.find(
+    (c) => !isFallbackBlue(c.hex) && (c.confidence === 'high' || c.confidence === 'medium')
+  )
+  const llmPrimary = validated.brandColors?.primary
+  const primary =
+    llmPrimary && !isFallbackBlue(llmPrimary)
+      ? llmPrimary
+      : (topCandidate?.hex ?? FALLBACK_BLUE)
+
+  if (topCandidate && (!llmPrimary || isFallbackBlue(llmPrimary))) {
+    console.log(`  [color] LLM returned no primary color — using top candidate: ${topCandidate.label} (${topCandidate.hex})`)
+  }
+
   return {
     siteName: validated.siteName,
     tagline: validated.tagline,
-    brandColors: validated.brandColors ?? {
-      primary: '#2563eb',
-      background: '#f4f1ec',
+    brandColors: {
+      ...(validated.brandColors ?? {}),
+      primary,
+      background: validated.brandColors?.background ?? '#f4f1ec',
     },
     nav: validated.nav,
     footerPhone: validated.footer?.phone,

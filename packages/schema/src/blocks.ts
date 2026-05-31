@@ -5,6 +5,8 @@ export interface HeroBlock {
   ctaText?: string
   ctaUrl?: string
   backgroundImageUrl?: string
+  /** When true, renders as a compact page-title banner instead of a full-height hero section. */
+  compact?: boolean
 }
 
 export interface TextSectionBlock {

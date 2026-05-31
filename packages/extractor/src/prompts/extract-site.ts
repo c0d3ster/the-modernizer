@@ -21,6 +21,7 @@ export const extractSitePrompt = (
     if (medium.length > 0) lines.push(`  Medium confidence (named theme palette colors): ${medium.map(fmt).join(', ')}`)
     if (low.length > 0) lines.push(`  Low confidence (inline styles): ${low.map(fmt).join(', ')}`)
     lines.push('')
+    lines.push('You MUST pick primary from the candidates list — do not invent or default to a generic color like blue.')
     lines.push('Prefer high-confidence candidates. For medium-confidence, use the color name to judge')
     lines.push('whether it fits the brand (e.g. "vivid-red" suits a healthcare site better than "vivid-green-cyan").')
     lines.push('Pick the most visually prominent non-grey color as primary. Omit fields you cannot determine.')

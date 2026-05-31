@@ -8,7 +8,21 @@ interface HeroBlockProps {
 }
 
 export const HeroBlock = ({ block }: HeroBlockProps): React.ReactElement => {
-  const { heading, subheading, ctaText, ctaUrl, backgroundImageUrl } = block
+  const { heading, subheading, ctaText, ctaUrl, backgroundImageUrl, compact } = block
+
+  // Compact mode: page-title banner for inner pages — no image, reduced height
+  if (compact && !backgroundImageUrl) {
+    return (
+      <section className="bg-primary py-10 text-primary-foreground md:py-14">
+        <div className={cn(container)}>
+          <h1 className="text-3xl font-bold tracking-tight md:text-4xl">{heading}</h1>
+          {subheading && (
+            <p className="mt-3 max-w-2xl text-base opacity-85">{subheading}</p>
+          )}
+        </div>
+      </section>
+    )
+  }
 
   return (
     <section
