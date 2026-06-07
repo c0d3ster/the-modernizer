@@ -8,17 +8,18 @@ The goal is **not** to recreate a legacy site pixel-for-pixel. Old layouts are t
 
 ## How it works
 
-Three-stage pipeline:
+Four-stage pipeline:
 
 ```
-Crawl → Extract → Generate
+Crawl → Extract → Schema JSON → Generate
 ```
 
 | Stage | Package | Description |
 |-------|---------|-------------|
 | Crawl | `@modernizer/crawler` | Discovers and fetches all pages on a target site |
 | Extract | `@modernizer/extractor` | Converts raw HTML into structured page schemas |
-| Generate | `@modernizer/generator` | Takes schemas and writes a complete Next.js project to disk |
+| Generate (default) | Lovable MCP | Sends the schema JSON to Lovable and returns a live project URL |
+| Generate (local) | `@modernizer/generator` | Writes a complete Next.js project to disk (`--local` flag) |
 
 ## Packages
 
@@ -40,16 +41,27 @@ Crawl → Extract → Generate
 ## Usage
 
 ```
-npx the-modernizer <url> --output <dir> [options]
+npx the-modernizer <url> [options]
 
+--local            Generate a local Next.js project instead of creating a Lovable project
 --schema-only      Stop after extraction, output SiteSchema JSON only
 --from-schema      Skip crawl/extract, generate from saved JSON
---download-assets  Fetch images to local public/ directory
---style            Design preset: clean | minimal | warm | corporate
 --primary-color    Override auto-detected brand color
 --max-pages        Max pages to crawl (default: 100)
---dry-run          Crawl and report structure without generating
+--output <dir>     Output directory (local mode only, defaults to .generated/<site-slug>)
 ```
+
+### Lovable setup
+
+By default the CLI creates a project on [Lovable](https://lovable.dev) and returns a live URL. Authentication uses OAuth — on first run a browser window opens for you to authorize. Tokens are stored in `~/.config/the-modernizer/lovable-auth.json`.
+
+Optionally override the MCP server URL via env var (defaults to `https://mcp.lovable.dev/sse`):
+
+```
+LOVABLE_MCP_URL=https://mcp.lovable.dev/sse
+```
+
+Use `--local` to skip Lovable and write a Next.js project to disk instead.
 
 ## Development
 

@@ -9,6 +9,7 @@ import { crawl } from '@modernizer/crawler'
 import { extract, getUsageStats } from '@modernizer/extractor'
 import { generateSite } from '@modernizer/generator'
 import { siteSchemaSchema } from '@modernizer/schema'
+import { createLovableProject } from './lovable-client.js'
 
 const slugify = (name: string): string =>
   name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
@@ -26,6 +27,7 @@ program
   .option('--schema-only', 'stop after extraction and write SiteSchema JSON', false)
   .option('--from-schema <file>', 'skip crawl/extract and generate from a saved schema JSON')
   .option('--primary-color <hex>', 'override auto-detected brand color (e.g. #2563eb)')
+  .option('--local', 'generate a local Next.js project instead of creating a Lovable project', false)
   .option('--verbose', 'detailed logging', false)
   .option(
     '--headless',
@@ -39,6 +41,7 @@ program.action(async (url: string | undefined, opts: {
   schemaOnly: boolean
   fromSchema?: string
   primaryColor?: string
+  local: boolean
   verbose: boolean
   headless?: boolean
 }) => {
@@ -58,13 +61,21 @@ program.action(async (url: string | undefined, opts: {
         schema = { ...schema, brandColors: { ...schema.brandColors, primary: opts.primaryColor } }
       }
 
-      const outDir = resolve(opts.output ?? join('.generated', slugify(schema.siteName)))
       log(`Generating: ${schema.siteName} (${schema.pages.length} pages)`)
-      await mkdir(outDir, { recursive: true })
-      await generateSite(schema, outDir)
-      const displayDir = (opts.output ?? outDir).replace(/\\/g, '/')
-      log(`\nDone! Output: ${displayDir}`)
-      log(`  cd ${displayDir} && npm install && npm run dev`)
+
+      if (opts.local) {
+        const outDir = resolve(opts.output ?? join('.generated', slugify(schema.siteName)))
+        await mkdir(outDir, { recursive: true })
+        await generateSite(schema, outDir)
+        const displayDir = (opts.output ?? outDir).replace(/\\/g, '/')
+        log(`\nDone! Output: ${displayDir}`)
+        log(`  cd ${displayDir} && npm install && npm run dev`)
+      } else {
+        log(`Generating site via Lovable...`)
+        const projectUrl = await createLovableProject(schema, verbose)
+        log(`\nLive at: ${projectUrl}`)
+        log(`  Open in Lovable to customize or deploy`)
+      }
       return
     }
 
@@ -109,13 +120,19 @@ program.action(async (url: string | undefined, opts: {
     }
 
     // ── Stage 3: generate ──────────────────────────────────────────────────
-    log(`Generating site...`)
-    await mkdir(outDir, { recursive: true })
-    await generateSite(schema, outDir)
-
-    const displayDir = (opts.output ?? outDir).replace(/\\/g, '/')
-    log(`\nDone! Output: ${displayDir}`)
-    log(`  cd ${displayDir} && npm install && npm run dev`)
+    if (opts.local) {
+      log(`Generating site...`)
+      await mkdir(outDir, { recursive: true })
+      await generateSite(schema, outDir)
+      const displayDir = (opts.output ?? outDir).replace(/\\/g, '/')
+      log(`\nDone! Output: ${displayDir}`)
+      log(`  cd ${displayDir} && npm install && npm run dev`)
+    } else {
+      log(`Generating site via Lovable...`)
+      const projectUrl = await createLovableProject(schema, verbose)
+      log(`\nLive at: ${projectUrl}`)
+      log(`  Open in Lovable to customize or deploy`)
+    }
   } catch (err) {
     process.stderr.write(`\nError: ${err instanceof Error ? err.message : String(err)}\n`)
     if (verbose && err instanceof Error && err.stack) {

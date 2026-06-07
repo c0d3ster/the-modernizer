@@ -31,11 +31,12 @@ The Modernizer is a command-line tool that accepts a URL, crawls the site, extra
 
 The system is a three-stage pipeline. Each stage has a clean interface boundary so it can be developed, tested, and improved independently.
 
-| Stage       | Input                      | Output                         | Primary Tool           |
-| ----------- | -------------------------- | ------------------------------ | ---------------------- |
-| 1. Crawl    | Seed URL                   | Raw HTML + metadata per page   | Playwright / fetch     |
-| 2. Extract  | Raw HTML per page          | Structured page schemas (JSON) | Cheerio + Claude API   |
-| 3. Generate | Page schemas + site schema | Runnable Next.js app on disk   | Claude API + templates |
+| Stage          | Input                      | Output                           | Primary Tool               |
+| -------------- | -------------------------- | -------------------------------- | -------------------------- |
+| 1. Crawl       | Seed URL                   | Raw HTML + metadata per page     | Playwright / fetch         |
+| 2. Extract     | Raw HTML per page          | Structured page schemas (JSON)   | Cheerio + Claude API       |
+| 3. Generate    | SiteSchema JSON            | Live Lovable project URL         | Lovable MCP (default)      |
+| 3b. Generate   | SiteSchema JSON            | Next.js app on disk (`--local`)  | @modernizer/generator      |
 
 ### Key Design Decisions
 
@@ -523,28 +524,27 @@ _Wire everything together into a single command._
 Command signature:
 
 ```
-npx the-modernizer <url> --output <dir> [options]
+npx the-modernizer <url> [options]
 ```
 
 Options:
 
-| Flag              | Default      | Description                                               |
-| ----------------- | ------------ | --------------------------------------------------------- |
-| --output, -o      | ./modernized | Output directory for the generated Next.js project        |
-| --max-pages       | 100          | Maximum pages to crawl                                    |
-| --max-depth       | 3            | Maximum link-following depth from seed URL                |
-| --concurrency     | 3            | Parallel page fetches                                     |
-| --style           | clean        | Design style preset: clean, minimal, warm, corporate      |
-| --primary-color   | (extracted)  | Override the auto-detected brand color                    |
-| --download-assets | false        | Download images to local public/ directory                |
-| --schema-only     | false        | Stop after extraction, output the SiteSchema JSON only    |
-| --from-schema     | (none)       | Skip crawl/extract, generate from a saved SiteSchema JSON |
-| --verbose         | false        | Detailed logging                                          |
-| --dry-run         | false        | Crawl and report page count/structure without generating  |
+| Flag              | Default      | Description                                                         |
+| ----------------- | ------------ | ------------------------------------------------------------------- |
+| --local           | false        | Generate a local Next.js project instead of creating a Lovable project |
+| --output, -o      | .generated/  | Output directory (local mode only)                                  |
+| --max-pages       | 100          | Maximum pages to crawl                                              |
+| --max-depth       | 3            | Maximum link-following depth from seed URL                          |
+| --primary-color   | (extracted)  | Override the auto-detected brand color                              |
+| --schema-only     | false        | Stop after extraction, output the SiteSchema JSON only              |
+| --from-schema     | (none)       | Skip crawl/extract, generate from a saved SiteSchema JSON           |
+| --verbose         | false        | Detailed logging                                                    |
 
 ### Step 6.2: Pipeline orchestration
 
-The CLI orchestrates the three stages sequentially: crawl, extract, generate. Between each stage, validate the intermediate output. If --schema-only is set, stop after extraction and write the JSON. If --from-schema is set, skip to generation. This lets users inspect and manually edit the schema before regenerating, which is a powerful escape hatch for tricky sites.
+The CLI orchestrates the stages sequentially: crawl, extract, generate. Between each stage, validate the intermediate output. If --schema-only is set, stop after extraction and write the JSON. If --from-schema is set, skip to generation.
+
+By default, generation sends the SiteSchema JSON to Lovable via MCP (`LOVABLE_MCP_URL` + `LOVABLE_API_KEY` env vars required) and prints the returned project URL. The `--local` flag bypasses Lovable and runs the file-based generator instead, writing a Next.js project to disk.
 
 ### Step 6.3: Progress display
 
@@ -671,6 +671,7 @@ Linear implementation order. Each task depends on the ones above it within its p
 - [x] **6.3:** Implement terminal progress display `[Small]`
 - [x] **6.4:** Implement error handling and graceful degradation `[Medium]`
 - [ ] **6.5:** Write E2E integration test `[Large]`
+- [ ] **6.6:** Integrate Lovable MCP as default generator (`--local` opt-out) `[Medium]`
 
 ### Phase 7: Polish (after Phase 6)
 
