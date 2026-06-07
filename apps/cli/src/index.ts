@@ -2,13 +2,14 @@
 import { config } from 'dotenv'
 import { resolve as resolvePath } from 'node:path'
 config({ path: resolvePath(process.cwd(), '.env') })
-import { writeFile, mkdir, readFile } from 'node:fs/promises'
+import { mkdir, readFile } from 'node:fs/promises'
 import { resolve, join } from 'node:path'
 import { Command } from 'commander'
 import { crawl } from '@modernizer/crawler'
 import { extract, getUsageStats } from '@modernizer/extractor'
 import { generateSite } from '@modernizer/generator'
 import { siteSchemaSchema } from '@modernizer/schema'
+import { createLovableProject } from './lovable-client.js'
 
 const slugify = (name: string): string =>
   name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
@@ -67,10 +68,10 @@ program.action(async (url: string | undefined, opts: {
         log(`\nDone! Output: ${displayDir}`)
         log(`  cd ${displayDir} && npm install && npm run dev`)
       } else {
-        log(`\nSchema ready: ${schemaPath}`)
-        log(`  Site: ${schema.siteName} (${schema.pages.length} pages)`)
-        log(`  Use the Lovable MCP tool via Claude Code to create the project:`)
-        log(`    create_project + send_message with the schema JSON as the prompt`)
+        log(`Generating site via Lovable...`)
+        const projectUrl = await createLovableProject(schema, verbose)
+        log(`\nLive at: ${projectUrl}`)
+        log(`  Open in Lovable to customize or deploy`)
       }
       return
     }
@@ -115,13 +116,10 @@ program.action(async (url: string | undefined, opts: {
       log(`\nDone! Output: ${displayDir}`)
       log(`  cd ${displayDir} && npm install && npm run dev`)
     } else {
-      const schemaPath = join(outDir, 'schema.json')
-      await writeFile(schemaPath, JSON.stringify(schema, null, 2))
-      const displayPath = schemaPath.replace(/\\/g, '/')
-      log(`\nSchema saved: ${displayPath}`)
-      log(`  Site: ${schema.siteName} (${schema.pages.length} pages)`)
-      log(`  Use the Lovable MCP tool via Claude Code to create the project:`)
-      log(`    create_project + send_message with the schema JSON as the prompt`)
+      log(`Generating site via Lovable...`)
+      const projectUrl = await createLovableProject(schema, verbose)
+      log(`\nLive at: ${projectUrl}`)
+      log(`  Open in Lovable to customize or deploy`)
     }
   } catch (err) {
     process.stderr.write(`\nError: ${err instanceof Error ? err.message : String(err)}\n`)
