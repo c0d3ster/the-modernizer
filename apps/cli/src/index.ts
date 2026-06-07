@@ -9,7 +9,6 @@ import { crawl } from '@modernizer/crawler'
 import { extract, getUsageStats } from '@modernizer/extractor'
 import { generateSite } from '@modernizer/generator'
 import { siteSchemaSchema } from '@modernizer/schema'
-import { createLovableProject } from './lovable-client.js'
 
 const slugify = (name: string): string =>
   name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
@@ -24,10 +23,9 @@ program
   .option('-o, --output <dir>', 'output directory (defaults to .generated/<site-slug>)')
   .option('--max-pages <n>', 'maximum pages to crawl', '100')
   .option('--max-depth <n>', 'maximum crawl depth', '3')
-  .option('--schema-only', 'stop after extraction and write SiteSchema JSON', false)
-  .option('--from-schema <file>', 'skip crawl/extract and generate from a saved schema JSON')
+  .option('--from-schema <file>', 'skip crawl/extract and load from a saved schema JSON')
   .option('--primary-color <hex>', 'override auto-detected brand color (e.g. #2563eb)')
-  .option('--local', 'generate a local Next.js project instead of creating a Lovable project', false)
+  .option('--local', 'generate a local Next.js project instead of saving schema for Lovable', false)
   .option('--verbose', 'detailed logging', false)
   .option(
     '--headless',
@@ -38,7 +36,6 @@ program.action(async (url: string | undefined, opts: {
   output?: string
   maxPages: string
   maxDepth: string
-  schemaOnly: boolean
   fromSchema?: string
   primaryColor?: string
   local: boolean
@@ -61,20 +58,19 @@ program.action(async (url: string | undefined, opts: {
         schema = { ...schema, brandColors: { ...schema.brandColors, primary: opts.primaryColor } }
       }
 
-      log(`Generating: ${schema.siteName} (${schema.pages.length} pages)`)
-
       if (opts.local) {
         const outDir = resolve(opts.output ?? join('.generated', slugify(schema.siteName)))
+        log(`Generating: ${schema.siteName} (${schema.pages.length} pages)`)
         await mkdir(outDir, { recursive: true })
         await generateSite(schema, outDir)
         const displayDir = (opts.output ?? outDir).replace(/\\/g, '/')
         log(`\nDone! Output: ${displayDir}`)
         log(`  cd ${displayDir} && npm install && npm run dev`)
       } else {
-        log(`Generating site via Lovable...`)
-        const projectUrl = await createLovableProject(schema, verbose)
-        log(`\nLive at: ${projectUrl}`)
-        log(`  Open in Lovable to customize or deploy`)
+        log(`\nSchema ready: ${schemaPath}`)
+        log(`  Site: ${schema.siteName} (${schema.pages.length} pages)`)
+        log(`  Use the Lovable MCP tool via Claude Code to create the project:`)
+        log(`    create_project + send_message with the schema JSON as the prompt`)
       }
       return
     }
@@ -109,29 +105,23 @@ program.action(async (url: string | undefined, opts: {
     }
 
     const outDir = resolve(opts.output ?? join('.generated', slugify(schema.siteName)))
+    await mkdir(outDir, { recursive: true })
 
-    // ── Schema-only mode ───────────────────────────────────────────────────
-    if (opts.schemaOnly) {
-      await mkdir(outDir, { recursive: true })
-      const schemaPath = join(outDir, 'schema.json')
-      await writeFile(schemaPath, JSON.stringify(schema, null, 2))
-      log(`\nSchema written to ${schemaPath.replace(/\\/g, '/')}`)
-      return
-    }
-
-    // ── Stage 3: generate ──────────────────────────────────────────────────
+    // ── Stage 3: generate (local) or save schema for Lovable ───────────────
     if (opts.local) {
       log(`Generating site...`)
-      await mkdir(outDir, { recursive: true })
       await generateSite(schema, outDir)
       const displayDir = (opts.output ?? outDir).replace(/\\/g, '/')
       log(`\nDone! Output: ${displayDir}`)
       log(`  cd ${displayDir} && npm install && npm run dev`)
     } else {
-      log(`Generating site via Lovable...`)
-      const projectUrl = await createLovableProject(schema, verbose)
-      log(`\nLive at: ${projectUrl}`)
-      log(`  Open in Lovable to customize or deploy`)
+      const schemaPath = join(outDir, 'schema.json')
+      await writeFile(schemaPath, JSON.stringify(schema, null, 2))
+      const displayPath = schemaPath.replace(/\\/g, '/')
+      log(`\nSchema saved: ${displayPath}`)
+      log(`  Site: ${schema.siteName} (${schema.pages.length} pages)`)
+      log(`  Use the Lovable MCP tool via Claude Code to create the project:`)
+      log(`    create_project + send_message with the schema JSON as the prompt`)
     }
   } catch (err) {
     process.stderr.write(`\nError: ${err instanceof Error ? err.message : String(err)}\n`)

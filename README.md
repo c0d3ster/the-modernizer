@@ -8,18 +8,16 @@ The goal is **not** to recreate a legacy site pixel-for-pixel. Old layouts are t
 
 ## How it works
 
-Four-stage pipeline:
-
 ```
-Crawl → Extract → Schema JSON → Generate
+Crawl → Extract → Schema JSON → [Lovable MCP via Claude Code | --local]
 ```
 
 | Stage | Package | Description |
 |-------|---------|-------------|
 | Crawl | `@modernizer/crawler` | Discovers and fetches all pages on a target site |
 | Extract | `@modernizer/extractor` | Converts raw HTML into structured page schemas |
-| Generate (default) | Lovable MCP | Sends the schema JSON to Lovable and returns a live project URL |
-| Generate (local) | `@modernizer/generator` | Writes a complete Next.js project to disk (`--local` flag) |
+| Generate (default) | Lovable MCP | Claude Code calls Lovable MCP with the schema to create a live project |
+| Generate (`--local`) | `@modernizer/generator` | Writes a complete Next.js project to disk |
 
 ## Packages
 
@@ -43,25 +41,31 @@ Crawl → Extract → Schema JSON → Generate
 ```
 npx the-modernizer <url> [options]
 
---local            Generate a local Next.js project instead of creating a Lovable project
---schema-only      Stop after extraction, output SiteSchema JSON only
---from-schema      Skip crawl/extract, generate from saved JSON
+--local            Generate a local Next.js project instead of saving schema for Lovable
+--from-schema      Skip crawl/extract, load from a saved schema JSON
 --primary-color    Override auto-detected brand color
 --max-pages        Max pages to crawl (default: 100)
---output <dir>     Output directory (local mode only, defaults to .generated/<site-slug>)
+--output <dir>     Output directory (defaults to .generated/<site-slug>)
 ```
 
-### Lovable setup
+### Default workflow (Lovable via Claude Code)
 
-By default the CLI creates a project on [Lovable](https://lovable.dev) and returns a live URL. Authentication uses OAuth — on first run a browser window opens for you to authorize. Tokens are stored in `~/.config/the-modernizer/lovable-auth.json`.
+1. Run `npx the-modernizer <url>` — crawls, extracts, and saves `schema.json`
+2. Claude Code (with [Lovable MCP](https://docs.lovable.dev/integrations/lovable-mcp-server) configured) reads the schema and calls:
+   - `list_workspaces` → get workspace ID
+   - `create_project` with the schema JSON as `initial_message`
+   - `deploy_project` → live URL
 
-Optionally override the MCP server URL via env var (defaults to `https://mcp.lovable.dev/sse`):
+Lovable MCP uses OAuth and must be connected through a supported client (Claude Desktop, Claude Code, Cursor, VS Code). See [Lovable MCP setup](https://docs.lovable.dev/integrations/lovable-mcp-server) for connection instructions.
+
+### Local workflow
+
+Use `--local` to skip Lovable and write a full Next.js project to disk:
 
 ```
-LOVABLE_MCP_URL=https://mcp.lovable.dev/sse
+npx the-modernizer <url> --local
+cd .generated/<site-slug> && npm install && npm run dev
 ```
-
-Use `--local` to skip Lovable and write a Next.js project to disk instead.
 
 ## Development
 

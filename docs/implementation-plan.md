@@ -544,7 +544,7 @@ Options:
 
 The CLI orchestrates the stages sequentially: crawl, extract, generate. Between each stage, validate the intermediate output. If --schema-only is set, stop after extraction and write the JSON. If --from-schema is set, skip to generation.
 
-By default, generation sends the SiteSchema JSON to Lovable via MCP (`LOVABLE_MCP_URL` + `LOVABLE_API_KEY` env vars required) and prints the returned project URL. The `--local` flag bypasses Lovable and runs the file-based generator instead, writing a Next.js project to disk.
+By default, the CLI saves `schema.json` after extraction. Claude Code (with Lovable MCP configured) then calls `list_workspaces` + `create_project` + `deploy_project` to create and deploy the Lovable project. Lovable MCP uses OAuth and must be connected through a supported client — the CLI does not call it directly. The `--local` flag bypasses this and runs the file-based generator instead, writing a Next.js project to disk.
 
 ### Step 6.3: Progress display
 
