@@ -2,7 +2,7 @@
 import { config } from 'dotenv'
 import { resolve as resolvePath } from 'node:path'
 config({ path: resolvePath(process.cwd(), '.env') })
-import { mkdir, readFile } from 'node:fs/promises'
+import { writeFile, mkdir, readFile } from 'node:fs/promises'
 import { resolve, join } from 'node:path'
 import { Command } from 'commander'
 import { crawl } from '@modernizer/crawler'
@@ -24,9 +24,10 @@ program
   .option('-o, --output <dir>', 'output directory (defaults to .generated/<site-slug>)')
   .option('--max-pages <n>', 'maximum pages to crawl', '100')
   .option('--max-depth <n>', 'maximum crawl depth', '3')
+  .option('--schema-only', 'stop after extraction and write schema.json (no generation)', false)
   .option('--from-schema <file>', 'skip crawl/extract and load from a saved schema JSON')
   .option('--primary-color <hex>', 'override auto-detected brand color (e.g. #2563eb)')
-  .option('--local', 'generate a local Next.js project instead of saving schema for Lovable', false)
+  .option('--local', 'generate a local Next.js project instead of creating a Lovable project', false)
   .option('--verbose', 'detailed logging', false)
   .option(
     '--headless',
@@ -37,6 +38,7 @@ program.action(async (url: string | undefined, opts: {
   output?: string
   maxPages: string
   maxDepth: string
+  schemaOnly: boolean
   fromSchema?: string
   primaryColor?: string
   local: boolean
@@ -108,7 +110,15 @@ program.action(async (url: string | undefined, opts: {
     const outDir = resolve(opts.output ?? join('.generated', slugify(schema.siteName)))
     await mkdir(outDir, { recursive: true })
 
-    // ── Stage 3: generate (local) or save schema for Lovable ───────────────
+    // ── Schema-only mode ───────────────────────────────────────────────────
+    if (opts.schemaOnly) {
+      const schemaPath = join(outDir, 'schema.json')
+      await writeFile(schemaPath, JSON.stringify(schema, null, 2))
+      log(`\nSchema written to ${schemaPath.replace(/\\/g, '/')}`)
+      return
+    }
+
+    // ── Stage 3: generate ──────────────────────────────────────────────────
     if (opts.local) {
       log(`Generating site...`)
       await generateSite(schema, outDir)
