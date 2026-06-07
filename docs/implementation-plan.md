@@ -29,14 +29,13 @@ The Modernizer is a command-line tool that accepts a URL, crawls the site, extra
 
 ### Pipeline Architecture
 
-The system is a four-stage pipeline. Each stage has a clean interface boundary so it can be developed, tested, and improved independently.
+The system is a three-stage pipeline. Each stage has a clean interface boundary so it can be developed, tested, and improved independently.
 
 | Stage       | Input                      | Output                         | Primary Tool           |
 | ----------- | -------------------------- | ------------------------------ | ---------------------- |
 | 1. Crawl    | Seed URL                   | Raw HTML + metadata per page   | Playwright / fetch     |
 | 2. Extract  | Raw HTML per page          | Structured page schemas (JSON) | Cheerio + Claude API   |
-| 3. Generate | Page schemas + site schema | Next.js project files          | Claude API + templates |
-| 4. Output   | Generated project          | Runnable Next.js app           | File system            |
+| 3. Generate | Page schemas + site schema | Runnable Next.js app on disk   | Claude API + templates |
 
 ### Key Design Decisions
 
@@ -532,7 +531,7 @@ Options:
 | Flag              | Default      | Description                                               |
 | ----------------- | ------------ | --------------------------------------------------------- |
 | --output, -o      | ./modernized | Output directory for the generated Next.js project        |
-| --max-pages       | 50           | Maximum pages to crawl                                    |
+| --max-pages       | 100          | Maximum pages to crawl                                    |
 | --max-depth       | 3            | Maximum link-following depth from seed URL                |
 | --concurrency     | 3            | Parallel page fetches                                     |
 | --style           | clean        | Design style preset: clean, minimal, warm, corporate      |
@@ -545,7 +544,7 @@ Options:
 
 ### Step 6.2: Pipeline orchestration
 
-The CLI orchestrates the four stages sequentially: crawl, extract, generate, verify. Between each stage, validate the intermediate output. If --schema-only is set, stop after extraction and write the JSON. If --from-schema is set, skip to generation. This lets users inspect and manually edit the schema before regenerating, which is a powerful escape hatch for tricky sites.
+The CLI orchestrates the three stages sequentially: crawl, extract, generate. Between each stage, validate the intermediate output. If --schema-only is set, stop after extraction and write the JSON. If --from-schema is set, skip to generation. This lets users inspect and manually edit the schema before regenerating, which is a powerful escape hatch for tricky sites.
 
 ### Step 6.3: Progress display
 
@@ -618,32 +617,32 @@ Linear implementation order. Each task depends on the ones above it within its p
 
 ### Phase 1: Foundation
 
-- [ ] **1.1:** Initialize Turborepo monorepo with 5 packages (schema, ui, crawler, extractor, generator) + 2 apps (cli, preview) `[Medium]`
-- [ ] **1.2:** Define all ContentBlock types in schema/blocks.ts `[Medium]`
-- [ ] **1.3:** Define PageSchema, SiteSchema, PageArchetype in schema/ `[Medium]`
-- [ ] **1.4:** Create Zod validation schemas mirroring all types `[Medium]`
-- [ ] **1.5:** Write schema validation tests `[Small]`
+- [x] **1.1:** Initialize Turborepo monorepo with 5 packages (schema, ui, crawler, extractor, generator) + 2 apps (cli, preview) `[Medium]`
+- [x] **1.2:** Define all ContentBlock types in schema/blocks.ts `[Medium]`
+- [x] **1.3:** Define PageSchema, SiteSchema, PageArchetype in schema/ `[Medium]`
+- [x] **1.4:** Create Zod validation schemas mirroring all types `[Medium]`
+- [x] **1.5:** Write schema validation tests `[Small]`
 
 ### Phase 2: Crawler
 
-- [ ] **2.1:** Implement url-utils.ts (normalize, dedupe, same-domain, asset detection) `[Small]`
-- [ ] **2.2:** Implement static fetcher with content-sufficiency check `[Medium]`
-- [ ] **2.3:** Implement Playwright fallback fetcher with browser reuse `[Medium]`
-- [ ] **2.4:** Implement link extractor (Cheerio-based, multi-source) `[Medium]`
-- [ ] **2.5:** Implement BFS crawler with rate limiting and depth cap `[Large]`
-- [ ] **2.6:** Define CrawlResult type and integrate output format `[Small]`
-- [ ] **2.7:** Write crawler tests (unit + integration with local server) `[Medium]`
+- [x] **2.1:** Implement url-utils.ts (normalize, dedupe, same-domain, asset detection) `[Small]`
+- [x] **2.2:** Implement static fetcher with content-sufficiency check `[Medium]`
+- [x] **2.3:** Implement Playwright fallback fetcher with browser reuse `[Medium]`
+- [x] **2.4:** Implement link extractor (Cheerio-based, multi-source) `[Medium]`
+- [x] **2.5:** Implement BFS crawler with rate limiting and depth cap `[Large]`
+- [x] **2.6:** Define CrawlResult type and integrate output format `[Small]`
+- [x] **2.7:** Write crawler tests (unit + integration with local server) `[Medium]`
 
 ### Phase 3: Extractor
 
-- [ ] **3.1:** Implement chrome stripping (hash-based cross-page detection) `[Large]`
-- [ ] **3.2:** Implement metadata extraction (title, description, images, OG tags) `[Medium]`
-- [ ] **3.3:** Implement block splitter (heading-based + structural splitting) `[Large]`
-- [ ] **3.4:** Build site-level data extraction prompt + LLM call (nav, footer, colors) `[Medium]`
-- [ ] **3.5:** Build block classification prompt + LLM call with Zod validation `[Large]`
-- [ ] **3.6:** Build page archetype classification (can batch with 3.5) `[Small]`
-- [ ] **3.7:** Assemble full SiteSchema output with validation `[Medium]`
-- [ ] **3.8:** Write extractor tests (unit + integration with HTML fixtures) `[Medium]`
+- [x] **3.1:** Implement chrome stripping (hash-based cross-page detection) `[Large]`
+- [x] **3.2:** Implement metadata extraction (title, description, images, OG tags) `[Medium]`
+- [x] **3.3:** Implement block splitter (heading-based + structural splitting) `[Large]`
+- [x] **3.4:** Build site-level data extraction prompt + LLM call (nav, footer, colors) `[Medium]`
+- [x] **3.5:** Build block classification prompt + LLM call with Zod validation `[Large]`
+- [x] **3.6:** Build page archetype classification (can batch with 3.5) `[Small]`
+- [x] **3.7:** Assemble full SiteSchema output with validation `[Medium]`
+- [x] **3.8:** Write extractor tests (unit + integration with HTML fixtures) `[Medium]`
 
 ### Phase 4: Component Library (can start after 1.2)
 
@@ -656,21 +655,21 @@ Linear implementation order. Each task depends on the ones above it within its p
 
 ### Phase 5: Generator (after Phase 3 + 4)
 
-- [ ] **5.1:** Implement project scaffolder (package.json, configs, app/ structure) `[Medium]`
-- [ ] **5.2:** Implement Tailwind config generator with brand color scaling `[Medium]`
-- [ ] **5.3:** Implement layout generator (root layout with nav + footer) `[Medium]`
-- [ ] **5.4:** Implement component writer (copies ui package components into output) `[Medium]`
-- [ ] **5.5:** Implement page generator (archetype templates + block rendering) `[Large]`
+- [x] **5.1:** Implement project scaffolder (package.json, configs, app/ structure) `[Medium]`
+- [x] **5.2:** Implement Tailwind config generator with brand color scaling `[Medium]`
+- [x] **5.3:** Implement layout generator (root layout with nav + footer) `[Medium]`
+- [x] **5.4:** Implement component writer (copies ui package components into output) `[Medium]`
+- [x] **5.5:** Implement page generator (archetype templates + block rendering) `[Large]`
 - [ ] **5.6:** Implement asset handler (URL references + optional download) `[Medium]`
 - [ ] **5.7:** Add build verification (run next build, report errors) `[Small]`
-- [ ] **5.8:** Write generator tests (fixture schema through full generation) `[Medium]`
+- [x] **5.8:** Write generator tests (fixture schema through full generation) `[Medium]`
 
 ### Phase 6: CLI (after Phase 5)
 
-- [ ] **6.1:** Implement CLI argument parsing with Commander.js `[Small]`
-- [ ] **6.2:** Implement pipeline orchestration (crawl > extract > generate > verify) `[Medium]`
-- [ ] **6.3:** Implement terminal progress display `[Small]`
-- [ ] **6.4:** Implement error handling and graceful degradation `[Medium]`
+- [x] **6.1:** Implement CLI argument parsing with Commander.js `[Small]`
+- [x] **6.2:** Implement pipeline orchestration (crawl > extract > generate) `[Medium]`
+- [x] **6.3:** Implement terminal progress display `[Small]`
+- [x] **6.4:** Implement error handling and graceful degradation `[Medium]`
 - [ ] **6.5:** Write E2E integration test `[Large]`
 
 ### Phase 7: Polish (after Phase 6)
