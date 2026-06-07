@@ -8,18 +8,17 @@ The goal is **not** to recreate a legacy site pixel-for-pixel. Old layouts are t
 
 ## How it works
 
-Four-stage pipeline:
+Three-stage pipeline:
 
 ```
-Crawl → Extract → Generate → Output
+Crawl → Extract → Generate
 ```
 
 | Stage | Package | Description |
 |-------|---------|-------------|
 | Crawl | `@modernizer/crawler` | Discovers and fetches all pages on a target site |
 | Extract | `@modernizer/extractor` | Converts raw HTML into structured page schemas |
-| Generate | `@modernizer/generator` | Takes schemas and outputs a complete Next.js project |
-| Output | `apps/cli` | CLI entry point that orchestrates the pipeline |
+| Generate | `@modernizer/generator` | Takes schemas and writes a complete Next.js project to disk |
 
 ## Packages
 
@@ -48,7 +47,7 @@ npx the-modernizer <url> --output <dir> [options]
 --download-assets  Fetch images to local public/ directory
 --style            Design preset: clean | minimal | warm | corporate
 --primary-color    Override auto-detected brand color
---max-pages        Max pages to crawl (default: 50)
+--max-pages        Max pages to crawl (default: 100)
 --dry-run          Crawl and report structure without generating
 ```
 

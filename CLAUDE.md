@@ -8,11 +8,11 @@ See `docs/implementation-plan.md` for the complete 7-phase implementation plan w
 
 ## Current Phase
 
-Working on **Phase 4: Component Library** (shadcn/ui primitives + block components).
+Phases 1-6 are complete. The pipeline runs end-to-end. Working on **Phase 7: Polish + Edge Cases**.
 
 ## Architecture
 
-Four-stage pipeline: **Crawl > Extract > Generate > Output**
+Three-stage pipeline: **Crawl > Extract > Generate**
 
 - `packages/schema` - Shared TypeScript types + Zod validation (the contract between all layers)
 - `packages/ui` - Component library: shadcn/ui primitives + block components (1:1 with ContentBlock types)
@@ -52,6 +52,6 @@ npx the-modernizer <url> --output <dir> [options]
 --download-assets  Fetch images to local public/ directory
 --style          Design preset: clean | minimal | warm | corporate
 --primary-color  Override auto-detected brand color
---max-pages      Max pages to crawl (default: 50)
+--max-pages      Max pages to crawl (default: 100)
 --dry-run        Crawl and report structure without generating
 ```
