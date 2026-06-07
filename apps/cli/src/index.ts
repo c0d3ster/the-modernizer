@@ -62,8 +62,9 @@ program.action(async (url: string | undefined, opts: {
       log(`Generating: ${schema.siteName} (${schema.pages.length} pages)`)
       await mkdir(outDir, { recursive: true })
       await generateSite(schema, outDir)
-      log(`\nDone! Output: ${outDir}`)
-      log(`  cd ${outDir} && npm install && npm run dev`)
+      const displayDir = (opts.output ?? outDir).replace(/\\/g, '/')
+      log(`\nDone! Output: ${displayDir}`)
+      log(`  cd ${displayDir} && npm install && npm run dev`)
       return
     }
 
@@ -103,7 +104,7 @@ program.action(async (url: string | undefined, opts: {
       await mkdir(outDir, { recursive: true })
       const schemaPath = join(outDir, 'schema.json')
       await writeFile(schemaPath, JSON.stringify(schema, null, 2))
-      log(`\nSchema written to ${schemaPath}`)
+      log(`\nSchema written to ${schemaPath.replace(/\\/g, '/')}`)
       return
     }
 
@@ -112,8 +113,9 @@ program.action(async (url: string | undefined, opts: {
     await mkdir(outDir, { recursive: true })
     await generateSite(schema, outDir)
 
-    log(`\nDone! Output: ${outDir}`)
-    log(`  cd ${outDir} && npm install && npm run dev`)
+    const displayDir = (opts.output ?? outDir).replace(/\\/g, '/')
+    log(`\nDone! Output: ${displayDir}`)
+    log(`  cd ${displayDir} && npm install && npm run dev`)
   } catch (err) {
     process.stderr.write(`\nError: ${err instanceof Error ? err.message : String(err)}\n`)
     if (verbose && err instanceof Error && err.stack) {
