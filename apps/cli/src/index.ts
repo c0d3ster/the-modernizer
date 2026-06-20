@@ -71,9 +71,7 @@ program.action(async (url: string | undefined, opts: {
         log(`  cd ${displayDir} && npm install && npm run dev`)
       } else {
         log(`Generating site via Lovable...`)
-        const projectUrl = await createLovableProject(schema, verbose)
-        log(`\nLive at: ${projectUrl}`)
-        log(`  Open in Lovable to customize or deploy`)
+        await createLovableProject(schema, verbose)
       }
       return
     }
@@ -127,9 +125,7 @@ program.action(async (url: string | undefined, opts: {
       log(`  cd ${displayDir} && npm install && npm run dev`)
     } else {
       log(`Generating site via Lovable...`)
-      const projectUrl = await createLovableProject(schema, verbose)
-      log(`\nLive at: ${projectUrl}`)
-      log(`  Open in Lovable to customize or deploy`)
+      await createLovableProject(schema, verbose)
     }
   } catch (err) {
     process.stderr.write(`\nError: ${err instanceof Error ? err.message : String(err)}\n`)
