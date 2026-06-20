@@ -544,7 +544,7 @@ Options:
 
 The CLI orchestrates the stages sequentially: crawl, extract, generate. Between each stage, validate the intermediate output. If --schema-only is set, stop after extraction and write the JSON. If --from-schema is set, skip to generation.
 
-By default, the CLI saves `schema.json` after extraction. Claude Code (with Lovable MCP configured) then calls `list_workspaces` + `create_project` + `deploy_project` to create and deploy the Lovable project. Lovable MCP uses OAuth and must be connected through a supported client — the CLI does not call it directly. The `--local` flag bypasses this and runs the file-based generator instead, writing a Next.js project to disk.
+By default, the CLI saves `schema.json` after extraction, then passes the SiteSchema to `createLovableProject` in `apps/cli/src/lovable-client.ts`. This function calls `buildPrompt(schema)` to format the schema into a structured natural-language prompt (site name, brand colors, nav, and per-page block summaries — no raw JSON) and opens `https://lovable.dev/?autosubmit=true#prompt=<encoded>` in the browser. The user logs into Lovable once and the project builds automatically. No API keys, OAuth, or MCP connection required. The `--local` flag bypasses this and runs `@modernizer/generator` instead, writing a Next.js project to disk.
 
 ### Step 6.3: Progress display
 
@@ -671,7 +671,7 @@ Linear implementation order. Each task depends on the ones above it within its p
 - [x] **6.3:** Implement terminal progress display `[Small]`
 - [x] **6.4:** Implement error handling and graceful degradation `[Medium]`
 - [ ] **6.5:** Write E2E integration test `[Large]`
-- [ ] **6.6:** Integrate Lovable MCP as default generator (`--local` opt-out) `[Medium]`
+- [x] **6.6:** Integrate Lovable as default generator via Build with URL (`--local` opt-out) `[Medium]`
 
 ### Phase 7: Polish (after Phase 6)
 
