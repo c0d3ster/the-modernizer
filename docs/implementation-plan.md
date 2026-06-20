@@ -35,7 +35,7 @@ The system is a three-stage pipeline. Each stage has a clean interface boundary 
 | -------------- | -------------------------- | -------------------------------- | -------------------------- |
 | 1. Crawl       | Seed URL                   | Raw HTML + metadata per page     | Playwright / fetch         |
 | 2. Extract     | Raw HTML per page          | Structured page schemas (JSON)   | Cheerio + Claude API       |
-| 3. Generate    | SiteSchema JSON            | Live Lovable project URL         | Lovable MCP (default)      |
+| 3. Generate    | SiteSchema JSON            | Lovable project (browser)        | Lovable Build with URL (default) |
 | 3b. Generate   | SiteSchema JSON            | Next.js app on disk (`--local`)  | @modernizer/generator      |
 
 ### Key Design Decisions
