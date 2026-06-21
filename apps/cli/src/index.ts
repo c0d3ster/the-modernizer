@@ -7,9 +7,10 @@ import { resolve, join } from 'node:path'
 import { Command } from 'commander'
 import { crawl } from '@modernizer/crawler'
 import { extract, getUsageStats } from '@modernizer/extractor'
-import { generateSite } from '@modernizer/generator'
+import { generateSite } from '@modernizer/generator-local'
 import { siteSchemaSchema } from '@modernizer/schema'
-import { createLovableProject } from './lovable-client.js'
+import { generateLovable } from '@modernizer/generator-lovable'
+import { generateWithClaude } from '@modernizer/generator-claude'
 
 const slugify = (name: string): string =>
   name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
@@ -27,7 +28,9 @@ program
   .option('--schema-only', 'stop after extraction and write schema.json (no generation)', false)
   .option('--from-schema <file>', 'skip crawl/extract and load from a saved schema JSON')
   .option('--primary-color <hex>', 'override auto-detected brand color (e.g. #2563eb)')
-  .option('--local', 'generate a local Next.js project instead of creating a Lovable project', false)
+  .option('--lovable', 'generate via Lovable browser (default when no generator flag is set)', false)
+  .option('--claude', 'generate via Claude API (requires ANTHROPIC_API_KEY in .env)', false)
+  .option('--local', 'generate a local Next.js project using the deterministic template generator', false)
   .option('--verbose', 'detailed logging', false)
   .option(
     '--headless',
@@ -41,6 +44,8 @@ program.action(async (url: string | undefined, opts: {
   schemaOnly: boolean
   fromSchema?: string
   primaryColor?: string
+  lovable: boolean
+  claude: boolean
   local: boolean
   verbose: boolean
   headless?: boolean
@@ -69,9 +74,17 @@ program.action(async (url: string | undefined, opts: {
         const displayDir = (opts.output ?? outDir).replace(/\\/g, '/')
         log(`\nDone! Output: ${displayDir}`)
         log(`  cd ${displayDir} && npm install && npm run dev`)
+      } else if (opts.claude) {
+        const outDir = resolve(opts.output ?? join('.generated', slugify(schema.siteName)))
+        log(`Generating via Claude API: ${schema.siteName} (${schema.pages.length} pages)`)
+        await mkdir(outDir, { recursive: true })
+        await generateWithClaude(schema, outDir, verbose)
+        const displayDir = (opts.output ?? outDir).replace(/\\/g, '/')
+        log(`\nDone! Output: ${displayDir}`)
+        log(`  cd ${displayDir} && npm install && npm run dev`)
       } else {
         log(`Generating site via Lovable...`)
-        await createLovableProject(schema, verbose)
+        generateLovable(schema, verbose)
       }
       return
     }
@@ -123,9 +136,15 @@ program.action(async (url: string | undefined, opts: {
       const displayDir = (opts.output ?? outDir).replace(/\\/g, '/')
       log(`\nDone! Output: ${displayDir}`)
       log(`  cd ${displayDir} && npm install && npm run dev`)
+    } else if (opts.claude) {
+      log(`Generating via Claude API: ${schema.siteName} (${schema.pages.length} pages)`)
+      await generateWithClaude(schema, outDir, verbose)
+      const displayDir = (opts.output ?? outDir).replace(/\\/g, '/')
+      log(`\nDone! Output: ${displayDir}`)
+      log(`  cd ${displayDir} && npm install && npm run dev`)
     } else {
       log(`Generating site via Lovable...`)
-      await createLovableProject(schema, verbose)
+      generateLovable(schema, verbose)
     }
   } catch (err) {
     process.stderr.write(`\nError: ${err instanceof Error ? err.message : String(err)}\n`)

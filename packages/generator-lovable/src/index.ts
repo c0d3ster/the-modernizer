@@ -2,6 +2,7 @@ import { exec } from 'node:child_process'
 import type { SiteSchema } from '@modernizer/schema'
 
 const LOVABLE_BUILD_URL = 'https://lovable.dev/'
+const PROMPT_LIMIT = 50_000
 
 const openBrowser = (url: string): void => {
   const cmd = process.platform === 'win32' ? `start "" "${url}"`
@@ -10,7 +11,7 @@ const openBrowser = (url: string): void => {
   exec(cmd)
 }
 
-const buildPrompt = (schema: SiteSchema): string => {
+export const buildLovablePrompt = (schema: SiteSchema): string => {
   const { siteName, rootUrl, brandColors, pages, nav } = schema
 
   const navItems = nav.map(n => n.label).join(', ')
@@ -44,14 +45,14 @@ Requirements:
 - shadcn/ui components where appropriate`
 }
 
-export const createLovableProject = async (schema: SiteSchema, verbose: boolean): Promise<string> => {
-  const prompt = buildPrompt(schema)
+export const generateLovable = (schema: SiteSchema, verbose = false): void => {
+  const prompt = buildLovablePrompt(schema)
 
   if (verbose) {
-    process.stdout.write(`  Prompt length: ${prompt.length} chars (limit: 50,000)\n`)
+    process.stdout.write(`  Prompt length: ${prompt.length} chars (limit: ${PROMPT_LIMIT.toLocaleString()})\n`)
   }
 
-  if (prompt.length > 50_000) {
+  if (prompt.length > PROMPT_LIMIT) {
     throw new Error(`Prompt too long (${prompt.length} chars). Use --max-pages to crawl fewer pages.`)
   }
 
@@ -60,6 +61,4 @@ export const createLovableProject = async (schema: SiteSchema, verbose: boolean)
   process.stdout.write(`\nOpening Lovable in your browser...\n`)
   process.stdout.write(`Log in if prompted — the project will build automatically.\n\n`)
   openBrowser(url)
-
-  return 'Project creation started in browser — check Lovable for the live URL once it builds.'
 }
