@@ -35,8 +35,9 @@ The system is a three-stage pipeline. Each stage has a clean interface boundary 
 | -------------- | -------------------------- | -------------------------------- | -------------------------- |
 | 1. Crawl       | Seed URL                   | Raw HTML + metadata per page     | Playwright / fetch         |
 | 2. Extract     | Raw HTML per page          | Structured page schemas (JSON)   | Cheerio + Claude API       |
-| 3. Generate    | SiteSchema JSON            | Lovable project (browser)        | Lovable Build with URL (default) |
-| 3b. Generate   | SiteSchema JSON            | Next.js app on disk (`--local`)  | @modernizer/generator      |
+| 3. Generate    | SiteSchema JSON            | Lovable project (browser)        | `@modernizer/generator-lovable` (default / `--lovable`) |
+| 3b. Generate   | SiteSchema JSON            | Next.js app on disk              | `@modernizer/generator-claude` (`--claude`, requires `ANTHROPIC_API_KEY`) |
+| 3c. Generate   | SiteSchema JSON            | Next.js app on disk              | `@modernizer/generator-local` (`--local`, deterministic templates, no API key) |
 
 ### Key Design Decisions
 
@@ -174,10 +175,11 @@ the-modernizer/                   # CLI tool monorepo (slimmer now)
     schema/
     crawler/
     extractor/
-    generator/                    # Now depends on @modernizer/ui from npm
+    generator-local/              # Now depends on @modernizer/ui from npm
+    generator-claude/
+    generator-lovable/
   apps/
     cli/
-    web/
 ```
 
 ### Component library structure
@@ -259,9 +261,15 @@ the-modernizer/
           classify-archetype.ts
           extract-nav.ts
           extract-brand.ts
-    generator/
+    generator-lovable/
       src/
-        index.ts               # Main generate() entry point
+        index.ts               # buildPrompt() + generateLovable() — opens browser via Build with URL
+    generator-claude/
+      src/
+        index.ts               # buildClaudePrompt() + generateWithClaude() — calls Claude API write_files tool
+    generator-local/
+      src/
+        index.ts               # Main generateSite() entry point — deterministic template generator
         scaffold.ts            # Create Next.js project skeleton
         page-generator.ts      # Render pages from schemas
         layout-generator.ts    # Generate root layout, nav, footer
@@ -474,9 +482,9 @@ Route structure: `/` renders all blocks stacked as a full page. `/blocks/[type]`
 
 ---
 
-## Phase 5: Generator
+## Phase 5: Generator (Local)
 
-_Takes a SiteSchema and outputs a complete, runnable Next.js project._
+_Takes a SiteSchema and outputs a complete, runnable Next.js project. This phase covers `@modernizer/generator-local` — the deterministic template generator used by `--local`. The Claude API generator (`--claude`) and Lovable generator (`--lovable`) are covered in Phase 6._
 
 ### Step 5.1: Project scaffolding
 
@@ -531,20 +539,27 @@ Options:
 
 | Flag              | Default      | Description                                                         |
 | ----------------- | ------------ | ------------------------------------------------------------------- |
-| --local           | false        | Generate a local Next.js project instead of creating a Lovable project |
-| --output, -o      | .generated/  | Output directory (local mode only)                                  |
+| _(default)_ or `--lovable` | false | Build a Lovable prompt and open `lovable.dev` in the browser. No API key required. |
+| `--claude`        | false        | Generate via Claude API (`write_files` tool). Requires `ANTHROPIC_API_KEY` in `.env`. |
+| `--local`         | false        | Generate a full Next.js project on disk using deterministic templates. No API key required. |
+| --output, -o      | .generated/  | Output directory (`--local` and `--claude` only)                    |
 | --max-pages       | 100          | Maximum pages to crawl                                              |
 | --max-depth       | 3            | Maximum link-following depth from seed URL                          |
 | --primary-color   | (extracted)  | Override the auto-detected brand color                              |
 | --schema-only     | false        | Stop after extraction, output the SiteSchema JSON only              |
 | --from-schema     | (none)       | Skip crawl/extract, generate from a saved SiteSchema JSON           |
+| --headless        | false        | Use headless Chromium (for CI/Docker)                               |
 | --verbose         | false        | Detailed logging                                                    |
 
 ### Step 6.2: Pipeline orchestration
 
 The CLI orchestrates the stages sequentially: crawl, extract, generate. Between each stage, validate the intermediate output. If --schema-only is set, stop after extraction and write the JSON. If --from-schema is set, skip to generation.
 
-By default, the CLI saves `schema.json` after extraction, then passes the SiteSchema to `createLovableProject` in `apps/cli/src/lovable-client.ts`. This function calls `buildPrompt(schema)` to format the schema into a structured natural-language prompt (site name, brand colors, nav, and per-page block summaries — no raw JSON) and opens `https://lovable.dev/?autosubmit=true#prompt=<encoded>` in the browser. The user logs into Lovable once and the project builds automatically. No API keys, OAuth, or MCP connection required. The `--local` flag bypasses this and runs `@modernizer/generator` instead, writing a Next.js project to disk.
+The CLI supports three generator modes after extraction:
+
+- **Default / `--lovable`:** Calls `generateLovable(schema)` from `@modernizer/generator-lovable`. Builds a structured prompt from the schema (site name, brand colors, nav, per-page block summaries) and opens `https://lovable.dev/?autosubmit=true#prompt=<encoded>` in the browser. The user logs into Lovable once and the project builds automatically. No API keys or OAuth required.
+- **`--claude`:** Calls `generateWithClaude(schema, outDir)` from `@modernizer/generator-claude`. Sends the schema to the Claude API using the `write_files` tool (`tool_choice: { type: 'tool', name: 'write_files' }`). The API returns a complete Next.js project as a list of file paths + contents, which are written to disk. Requires `ANTHROPIC_API_KEY` in `.env`.
+- **`--local`:** Calls `generateSite(schema, outDir)` from `@modernizer/generator-local`. Runs the deterministic template generator against pre-built block components. No API key required.
 
 ### Step 6.3: Progress display
 
@@ -653,7 +668,7 @@ Linear implementation order. Each task depends on the ones above it within its p
 - [x] **4.5:** Build Navbar (mobile toggle, `use client`) and Footer layout components `[Medium]`
 - [x] **4.6:** Wire up preview app (apps/preview) with Tailwind v4, all tokens, and sample data for every block `[Medium]`
 
-### Phase 5: Generator (after Phase 3 + 4)
+### Phase 5: Generator — Local (after Phase 3 + 4)
 
 - [x] **5.1:** Implement project scaffolder (package.json, configs, app/ structure) `[Medium]`
 - [x] **5.2:** Implement Tailwind config generator with brand color scaling `[Medium]`
@@ -672,6 +687,9 @@ Linear implementation order. Each task depends on the ones above it within its p
 - [x] **6.4:** Implement error handling and graceful degradation `[Medium]`
 - [ ] **6.5:** Write E2E integration test `[Large]`
 - [x] **6.6:** Integrate Lovable as default generator via Build with URL (`--local` opt-out) `[Medium]`
+- [x] **6.7:** Add `@modernizer/generator-claude` with `write_files` tool for on-disk generation via Claude API (`--claude`) `[Medium]`
+- [x] **6.8:** Add `--lovable` as an explicit flag (Lovable remains default when no generator flag is set) `[Small]`
+- [x] **6.9:** Add `scripts/compare-generators.sh` to run all three generators against the same schema fixture `[Small]`
 
 ### Phase 7: Polish (after Phase 6)
 
@@ -688,7 +706,7 @@ Linear implementation order. Each task depends on the ones above it within its p
 - [ ] **E.3:** Publish @modernizer/schema as its own npm package (shared type dependency) `[Medium]`
 - [ ] **E.4:** Create modernizer-ui repo, migrate packages/ui source with git history, set up CI + Changesets + npm publish `[Large]`
 - [ ] **E.5:** Migrate apps/preview into the new ui repo as the library dev playground `[Medium]`
-- [ ] **E.6:** Update generator to consume @modernizer/ui from npm, update component-writer.ts to resolve from node_modules `[Medium]`
+- [ ] **E.6:** Update `@modernizer/generator-local` to consume @modernizer/ui from npm, update component-writer.ts to resolve from node_modules `[Medium]`
 - [ ] **E.7:** Set up cross-repo workflows: Renovate/Dependabot for version bumps, E2E regression testing on ui updates `[Medium]`
 
 ---
@@ -703,7 +721,9 @@ This document is designed to be handed to a Claude Code instance working in the 
 - The preview app at apps/preview is the visual test harness. It renders every block component with sample data in one scrollable page. Use this to verify designs before the generator exists.
 - For LLM prompts (Steps 3.4, 3.5, 3.6, 7.2): store prompts as template literal functions in dedicated files. This makes them easy to iterate on independently.
 - Use the Edgehill Recovery site (https://edgehillrecovery.org/) as the primary test fixture. Save its crawled HTML locally for repeatable integration tests.
-- The generator copies components from packages/ui into the output project (not importing from an npm package). The component-writer.ts file handles this. Generated code should be readable and editable by a human after generation.
+- The local generator (`@modernizer/generator-local`) copies components from packages/ui into the output project (not importing from an npm package). The component-writer.ts file handles this. Generated code should be readable and editable by a human after generation.
+- The Claude generator (`@modernizer/generator-claude`) uses the Anthropic SDK with `tool_choice: { type: 'tool', name: 'write_files' }` to get a complete file list from the API and writes them to disk. See `packages/generator-claude/src/index.ts`.
+- To compare all three generators against the same fixture, run `./scripts/compare-generators.sh`. Default fixture: `packages/extractor/fixtures/edgehill-wayback-2026.json` (Wayback Machine snapshot of Edgehill Recovery from April 11, 2026, before modernization).
 - The --schema-only and --from-schema flags are critical for development workflow. They let you iterate on extraction and generation independently.
 - Use Anthropic SDK with model "claude-sonnet-4-20250514" for all LLM calls. Sonnet balances speed, cost, and quality for this use case.
 - Every LLM call should have a Zod validation step on the response. Never trust raw LLM JSON output.

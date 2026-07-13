@@ -202,8 +202,8 @@ Stage 3 — HTML fetch + static scoring
   → fetch homepage HTML (plain GET, no JS)
   → score against static signals (viewport, copyright, WP theme, OG tags, tables, SSL)
   ↓
-Stage 4 — Lighthouse / PSI scoring (optional, slower)
-  → call PSI API for mobile performance score
+Stage 4 — Lighthouse / PSI scoring
+  → call PSI API for mobile performance, SEO, and accessibility scores
   → adds ~2s per URL
   ↓
 Stage 5 — Output ranked CSV
@@ -213,7 +213,7 @@ Stage 5 — Output ranked CSV
 
 **Suggested script location:** `scripts/discover-candidates.ts`
 
-**Estimated run time:** ~5 min for 200 URLs (mostly PSI API latency). Skip PSI on first pass, add it for top candidates only.
+**Estimated run time:** ~5 min for 200 URLs, mostly PSI API latency (~2s per URL).
 
 ---
 
@@ -226,7 +226,7 @@ Scoring uses **two independent automated sub-scores** combined into a weighted f
 ### Final score formula
 
 ```
-final = (static_score × 0.40) + (psi_score × 0.60)
+final = (static_score × 0.50) + (psi_score × 0.50)
 ```
 
 **Thresholds:**
@@ -236,7 +236,7 @@ final = (static_score × 0.40) + (psi_score × 0.60)
 
 ---
 
-### Sub-score 1: Static HTML (40% weight)
+### Sub-score 1: Static HTML (50% weight)
 
 Fast checks against raw HTML — no browser, no API key. Each signal has a weight. The sub-score is calculated as:
 
@@ -244,25 +244,52 @@ Fast checks against raw HTML — no browser, no API key. Each signal has a weigh
 static_score = 100 × (1 − fired_weight / total_weight)
 ```
 
-Total weight across all signals = 100. Signals that don't fire contribute 0.
+Non-staleness signals sum to 80. The staleness signal fills the remaining 20, giving a total of 100.
 
-| Signal | Weight | Detection method |
+| Signal | Weight | Rationale |
 |---|---|---|
-| No HTTPS / expired SSL | 22 | `https://` fetch fails or cert error |
-| No viewport meta tag | 22 | `<meta name="viewport">` absent |
-| Last content change > 3 years (Wayback) | 20 | CDX digest comparison — see Wayback section |
-| Last content change 2-3 years (Wayback) | 10 | Same method, less severe (use one or the other) |
-| WordPress with old default theme | 12 | `/wp-content/themes/(twentytwelve\|...\|twentyseventeen)/` in source |
-| Table-based layout | 10 | `<table>` in non-data context |
-| No Open Graph tags | 8 | `<meta property="og:` absent |
-| Page weight > 3MB | 4 | Response body size |
-| Copyright year < 2020 | 2 | Regex `©\s*(20(0[0-9]\|1[0-9]))` — weak, auto-updated by most CMS |
+| No HTTPS / expired SSL | 20 | Chrome has shown "Not Secure" since 2018 and Google has used HTTPS as a ranking signal since 2014. A site still on HTTP has been almost entirely untouched. Detection: `https://` fetch fails or returns a cert error. |
+| No viewport meta tag | 20 | Absence means the site was built before mobile-first became standard (~2013). Google uses mobile-first indexing, so this also directly harms SEO. Detection: `<meta name="viewport">` absent from `<head>`. |
+| Staleness (Wayback or copyright fallback) | 0-20 | Measures how long since the content actually changed. Reliable and not gameable via the CDX digest method. Capped at 20 because a site can look dated even if it publishes blog posts regularly — staleness alone isn't disqualifying. See formula below. |
+| Old jQuery version | 12 | jQuery 1.x and 2.x were EOL in 2016 and 2014 respectively. Most unmaintained sites are still on these. A modern site uses jQuery 3.x or no jQuery at all. Detection: `jquery-1.` or `jquery-2.` in script `src` attributes. |
+| WordPress with old default theme | 10 | WordPress ships a new default theme every year named after the year: Twenty Ten (2010) through Twenty Twenty-Five (2025). Sites using Twenty Ten through Twenty Nineteen haven't updated their theme in at least 5 years. Detection: `/wp-content/themes/(twentyten\|twentyeleven\|twentytwelve\|twentythirteen\|twentyfourteen\|twentyfifteen\|twentysixteen\|twentyseventeen\|twentyeighteen\|twentynineteen)/` in HTML source. |
+| Table-based layout | 10 | Using `<table>` for page layout (rather than data) was standard before CSS floats and flexbox took over (~2008-2012). When this fires it's a near-certain indicator of a very old build. Detection: `<table>` elements containing layout columns rather than tabular data. |
+| No Open Graph tags | 5 | OG tags have been standard practice since ~2012 and are added automatically by every major WordPress plugin (Yoast, RankMath, etc.). Absence suggests the site has never had an SEO plugin installed, which correlates with neglect. Detection: `<meta property="og:` absent. |
+| IE compatibility meta tag | 3 | `<meta http-equiv="X-UA-Compatible" content="IE=edge">` was added by developers targeting Internet Explorer, which reached EOL in 2022. Its presence indicates the site hasn't been meaningfully touched since IE was a concern. Detection: `X-UA-Compatible` in meta tags. |
 
-> Note: Wayback signals are mutually exclusive — only the stronger one fires. Maximum static penalty from stacking all other signals: 58 points, leaving a floor well above 0.
+**Signals considered and not included:**
+
+- **No canonical tag** — too common even on modern sites to be a useful signal
+- **Flash / `.swf` references** — effectively extinct; would only fire on genuinely ancient sites already caught by table layout
+- **Old Google Analytics (`ga.js`)** — detectable but rarely present since Universal Analytics was deprecated in 2023; `gtag.js` is now near-universal regardless of site age
+- **Large unoptimized images** — overlaps with page weight signal; not worth a separate check
+- **No favicon** — too noisy; many legitimate small businesses skip favicons
+- **Fixed-width layout (e.g. `width: 960px`)** — would require CSS parsing, not just HTML; ruled out for static scoring complexity
 
 ---
 
-### Sub-score 2: Lighthouse / PSI (60% weight)
+**Staleness weight formula:**
+
+If Wayback CDX returns snapshots for the URL, use the sliding scale based on years since the last digest change:
+
+```
+staleness_weight = min(years_since_last_change × 4, 20)
+```
+
+| Years since last update | Staleness weight |
+|---|---|
+| < 1 year | 0-4 |
+| 1 year | 4 |
+| 2 years | 8 |
+| 3 years | 12 |
+| 4 years | 16 |
+| 5+ years | 20 (capped) |
+
+If Wayback has **no data** for the URL, fall back to the copyright year regex (`©\s*(20(0[0-9]|1[0-9]))`) as a weak staleness signal worth **10 points** if it fires. This reduces the static score ceiling to 90 for those URLs, which is acceptable — no Wayback data also means a less confident score overall.
+
+---
+
+### Sub-score 2: Lighthouse / PSI (50% weight)
 
 Lighthouse is the open-source audit engine built into Chrome DevTools (Lighthouse tab). The PageSpeed Insights API runs the same engine server-side — no browser required, just an HTTP call.
 
@@ -280,10 +307,10 @@ GET https://www.googleapis.com/pagespeedonline/v5/runPagespeed
 - `lighthouseResult.categories.seo.score` — multiply by 100
 - `lighthouseResult.categories.accessibility.score` — multiply by 100
 
-**PSI sub-score formula** — weighted average of three Lighthouse categories:
+**PSI sub-score formula** — weighted average of three Lighthouse categories, with SEO and accessibility weighted higher than raw performance since server speed is not a signal of design neglect:
 
 ```
-psi_score = (performance × 0.5) + (seo × 0.3) + (accessibility × 0.2)
+psi_score = (performance × 0.30) + (seo × 0.40) + (accessibility × 0.30)
 ```
 
 All three are already 0-100, so the result is always in range.
@@ -312,8 +339,8 @@ The `collapse=digest` parameter is the key: it returns only the first snapshot f
 **Logic for scoring:**
 1. Fetch the collapsed CDX results for the URL
 2. Find the most recent entry — its `timestamp` is when the site last meaningfully changed
-3. Compare that date to today
-4. Apply the appropriate weight in the static sub-score (weight 20 if > 3 years ago, weight 10 if 2-3 years ago — mutually exclusive)
+3. Calculate years elapsed since that timestamp
+4. Compute staleness weight: `min(years × 4, 20)` and apply it in the static sub-score
 5. Store the date in the `last_changed` output column
 
 **Caveats:**
@@ -339,7 +366,7 @@ The scoring script outputs a CSV sorted by score ascending — lowest score = wo
 | `no_og_tags` | boolean | No Open Graph meta tags |
 | `table_layout` | boolean | Tables used for page layout |
 | `static_score` | 0-100 | Normalized static HTML sub-score |
-| `psi_score` | 0-100 | Weighted Lighthouse sub-score (performance 50%, SEO 30%, accessibility 20%) |
+| `psi_score` | 0-100 | Weighted Lighthouse sub-score (performance 30%, SEO 40%, accessibility 30%) |
 | `psi_performance` | 0-100 | Raw Lighthouse mobile performance score |
 | `psi_seo` | 0-100 | Raw Lighthouse SEO score |
 | `psi_accessibility` | 0-100 | Raw Lighthouse accessibility score |
