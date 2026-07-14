@@ -3,7 +3,7 @@ import { join, dirname } from 'node:path'
 import Anthropic from '@anthropic-ai/sdk'
 import type { SiteSchema, ContentBlock } from '@modernizer/schema'
 
-const MODEL = 'claude-sonnet-4-20250514'
+const MODEL = 'claude-sonnet-4-5'
 const MAX_TOKENS = 32_000
 
 interface GeneratedFile {

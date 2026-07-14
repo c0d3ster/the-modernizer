@@ -132,10 +132,14 @@ GET https://maps.googleapis.com/maps/api/place/textsearch/json
 ```
 
 **Response fields to extract:**
-- `results[].website` — the business URL to score
+- `results[].website` — the business URL to score (absent = greenfield lead)
 - `results[].name` — business name for output
+- `results[].formatted_phone_number` — for outreach CSV (requires Place Details call)
+- `results[].vicinity` / `results[].formatted_address` — location for output
 - `results[].user_ratings_total` — filter to 10-200 reviews (active but small)
 - `results[].rating` — optional, not strongly correlated with site quality
+
+**Note:** `formatted_phone_number` and `formatted_address` are not returned by Text Search — they require a follow-up Place Details call (`/place/details/json?place_id=...&fields=formatted_phone_number,formatted_address`). Batch these after Stage 1 to avoid hitting the Details API for businesses you'll drop anyway.
 
 **Pagination:** Each response returns up to 20 results with a `next_page_token`. Request up to 3 pages (60 results) per query.
 
@@ -193,10 +197,13 @@ SerpAPI proxies Google Maps search results programmatically. More expensive than
 Config: city, state, business types[], API keys
   ↓
 Stage 1 — Discovery (Google Places API per business type)
-  → outputs: [{name, website, place_id, review_count}]
+  → outputs: [{name, website, place_id, review_count, phone, address, city, state}]
   ↓
-Stage 2 — Dedup + filter
-  → drop: no website, review_count < 5 or > 500, chains (Domino's, Jiffy Lube, etc.)
+Stage 2 — Route by website presence
+  → no website → greenfield-leads.csv (direct outreach, new build via c0d3ster)
+  → has website + review_count < 5 or > 500 → drop
+  → has website + chain detected (Domino's, Jiffy Lube, etc.) → drop
+  → has website → continue to scoring
   ↓
 Stage 3 — HTML fetch + static scoring
   → fetch homepage HTML (plain GET, no JS)
@@ -208,10 +215,14 @@ Stage 4 — Lighthouse / PSI scoring
   ↓
 Stage 5 — Output ranked CSV
   → sort by score ascending (lowest = best prospect)
-  → top 20 feed directly into the modernizer pipeline
+  → top 20 feed directly into the modernizer pipeline → candidates.csv
 ```
 
 **Suggested script location:** `scripts/discover-candidates.ts`
+
+**Output files:**
+- `candidates.csv` — businesses with a website, sorted by modernity score (low = best prospect). Top candidates feed into `pnpm modernize`.
+- `greenfield-leads.csv` — businesses with no website at all. Direct outreach for a new build; route to c0d3ster for project provisioning.
 
 **Estimated run time:** ~5 min for 200 URLs, mostly PSI API latency (~2s per URL).
 
@@ -352,16 +363,24 @@ The `collapse=digest` parameter is the key: it returns only the first snapshot f
 
 ## Output Format
 
-The scoring script outputs a CSV sorted by score ascending — lowest score = worst site = best prospect. Top candidates feed directly into the modernizer pipeline for before/after comparisons.
+The pipeline produces two separate CSV files.
+
+### `candidates.csv`
+
+Businesses with an existing website, sorted by modernity score ascending — lowest score = worst site = best modernization prospect. Top candidates feed directly into `pnpm modernize`.
 
 | Column | Type | Description |
 |---|---|---|
+| `business_name` | string | From Places API |
+| `phone` | string | Business phone number (from Place Details) |
+| `address` | string | Street address |
+| `city` | string | City |
+| `state` | string | State |
 | `url` | string | Homepage URL |
-| `business_name` | string | From Places API or directory |
 | `score` | 0-100 | Modernity score — lower is a better prospect |
 | `no_ssl` | boolean | HTTPS fetch failed or cert error |
 | `no_viewport` | boolean | Missing viewport meta tag |
-| `last_changed` | date | True last-updated date from Wayback CDX (see below) |
+| `last_changed` | date | True last-updated date from Wayback CDX |
 | `old_wp_theme` | boolean | Old default WordPress theme detected |
 | `no_og_tags` | boolean | No Open Graph meta tags |
 | `table_layout` | boolean | Tables used for page layout |
@@ -372,14 +391,37 @@ The scoring script outputs a CSV sorted by score ascending — lowest score = wo
 | `psi_accessibility` | 0-100 | Raw Lighthouse accessibility score |
 | `notes` | string | Details — e.g. "wp-theme: twentyfifteen, copyright: 2016" |
 
+### `greenfield-leads.csv`
+
+Businesses with no website detected. No scoring — they can't be crawled. Direct outreach for a greenfield build; route accepted projects to c0d3ster for repo and deployment provisioning.
+
+| Column | Type | Description |
+|---|---|---|
+| `business_name` | string | From Places API |
+| `phone` | string | Business phone number (from Place Details) |
+| `address` | string | Street address |
+| `city` | string | City |
+| `state` | string | State |
+| `vertical` | string | Business type from the discovery query (e.g. "plumber", "dentist") |
+| `review_count` | number | Google review count — proxy for business activity |
+| `rating` | number | Google rating |
+| `place_id` | string | Google Place ID — for follow-up Details API calls if needed |
+
 ---
 
 ## Notes on Outreach
 
-Once you have a scored list:
+### Modernization candidates (`candidates.csv`)
 
-- Show a screenshot of their current site next to the Lovable or Claude-generated output
+- Generate a before/after using `pnpm modernize <url>` before reaching out — having a demo ready is the strongest pitch
+- Show a screenshot of their current site next to the generated output
 - Emphasize mobile: most customers will find them on a phone before they call
 - Frame it as a one-time project, not a subscription (lower barrier to yes)
 - Contractors/trades respond to "more leads from Google" framing
 - Professional services (dental, legal) respond to "credibility and trust" framing
+
+### Greenfield leads (`greenfield-leads.csv`)
+
+- No before/after demo is possible — lead with the business category and show examples of similar sites you've built
+- Frame it as: "your competitors are findable online and you're not"
+- Accepted projects get provisioned through c0d3ster (repo from Next.js template, Vercel deployment, client portal access)

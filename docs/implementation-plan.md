@@ -725,6 +725,6 @@ This document is designed to be handed to a Claude Code instance working in the 
 - The Claude generator (`@modernizer/generator-claude`) uses the Anthropic SDK with `tool_choice: { type: 'tool', name: 'write_files' }` to get a complete file list from the API and writes them to disk. See `packages/generator-claude/src/index.ts`.
 - To compare all three generators against the same fixture, run `./scripts/compare-generators.sh`. Default fixture: `packages/extractor/fixtures/edgehill-wayback-2026.json` (Wayback Machine snapshot of Edgehill Recovery from April 11, 2026, before modernization).
 - The --schema-only and --from-schema flags are critical for development workflow. They let you iterate on extraction and generation independently.
-- Use Anthropic SDK with model "claude-sonnet-4-20250514" for all LLM calls. Sonnet balances speed, cost, and quality for this use case.
+- Use Anthropic SDK with model "claude-sonnet-4-5" for all LLM calls. Sonnet balances speed, cost, and quality for this use case.
 - Every LLM call should have a Zod validation step on the response. Never trust raw LLM JSON output.
 - Plan for eventual extraction of packages/ui into its own repo. Keep it loosely coupled: no imports from crawler, extractor, or generator packages. The only shared dependency should be packages/schema for the block type definitions.

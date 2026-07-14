@@ -40,7 +40,7 @@ The Edgehill Recovery site (https://edgehillrecovery.org/) is the primary test f
 
 ## LLM Usage
 
-Use Anthropic SDK with model `claude-sonnet-4-20250514` for all LLM calls. Always validate responses with Zod. Failed blocks fall back to GenericSectionBlock.
+Use Anthropic SDK with model `claude-sonnet-4-5` for all LLM calls. Always validate responses with Zod. Failed blocks fall back to GenericSectionBlock.
 
 ## CLI Quick Reference
 
