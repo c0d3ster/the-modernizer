@@ -4,7 +4,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import type { SiteSchema, ContentBlock } from '@modernizer/schema'
 
 const MODEL = 'claude-sonnet-4-5'
-const MAX_TOKENS = 32_000
+const MAX_TOKENS = 64_000
 
 interface GeneratedFile {
   path: string
@@ -113,7 +113,7 @@ export const generateWithClaude = async (schema: SiteSchema, outDir: string, ver
 
   process.stdout.write('  Calling Claude API...\n')
 
-  const response = await client.messages.create({
+  const stream = client.messages.stream({
     model: MODEL,
     max_tokens: MAX_TOKENS,
     system: 'You are an expert frontend engineer. Always call write_files with the complete generated file tree.',
@@ -143,6 +143,8 @@ export const generateWithClaude = async (schema: SiteSchema, outDir: string, ver
     tool_choice: { type: 'tool', name: 'write_files' },
     messages: [{ role: 'user', content: prompt }],
   })
+
+  const response = await stream.finalMessage()
 
   const toolUse = response.content.find(b => b.type === 'tool_use' && b.name === 'write_files')
   if (!toolUse || toolUse.type !== 'tool_use') {
