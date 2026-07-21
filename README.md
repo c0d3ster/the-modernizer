@@ -66,10 +66,10 @@ pnpm modernize --from-schema ./fixtures/schema.json --claude
 
 ## Comparing Generators
 
-Use `scripts/compare-generators.sh` to run all three generators against the same schema and compare outputs side by side. This is the recommended way to evaluate quality differences before pitching to a client.
+Use `pnpm generate-compare` to run all three generators against the same schema and compare outputs side by side. This is the recommended way to evaluate quality differences before pitching to a client.
 
 ```bash
-./scripts/compare-generators.sh [path/to/schema.json]
+pnpm generate-compare [-- path/to/schema.json]
 ```
 
 Default schema: `packages/extractor/fixtures/edgehill-wayback-2026.json`
@@ -87,7 +87,7 @@ mv packages/extractor/fixtures/schema.json \
    packages/extractor/fixtures/edgehill-wayback-2026.json
 
 # Run the comparison
-./scripts/compare-generators.sh
+pnpm generate-compare
 ```
 
 Outputs:
@@ -124,4 +124,5 @@ pnpm lint          # Lint all packages
 pnpm check-types   # Type-check all packages
 pnpm test          # Run tests
 pnpm format        # Format all files with Prettier
+pnpm generate-compare  # Run all three generators against the fixture schema
 ```

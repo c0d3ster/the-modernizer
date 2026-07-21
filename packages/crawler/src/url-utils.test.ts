@@ -6,6 +6,7 @@ import {
   isNavigableUrl,
   isSameDomain,
   normalizeUrl,
+  unwrapWaybackUrl,
 } from './url-utils.js'
 
 describe('normalizeUrl', () => {
@@ -51,6 +52,74 @@ describe('isSameDomain', () => {
 
   it('returns false for subdomain', () => {
     expect(isSameDomain('https://sub.example.com/page', 'https://example.com')).toBe(false)
+  })
+
+  it('unwraps wayback snapshot urls before comparing', () => {
+    expect(
+      isSameDomain(
+        'https://web.archive.org/web/20260411201239/https://edgehillrecovery.org/about',
+        'https://web.archive.org/web/20260411201239/https://edgehillrecovery.org/'
+      )
+    ).toBe(true)
+  })
+
+  it('treats different snapshot timestamps of the same site as same domain', () => {
+    expect(
+      isSameDomain(
+        'https://web.archive.org/web/20240101000000/https://edgehillrecovery.org/about',
+        'https://web.archive.org/web/20260411201239/https://edgehillrecovery.org/'
+      )
+    ).toBe(true)
+  })
+
+  it('rejects the wayback calendar snapshot picker', () => {
+    expect(
+      isSameDomain(
+        'https://web.archive.org/web/20260411201239*/https://edgehillrecovery.org',
+        'https://web.archive.org/web/20260411201239/https://edgehillrecovery.org/'
+      )
+    ).toBe(false)
+  })
+
+  it('rejects the wayback screenshot endpoint', () => {
+    expect(
+      isSameDomain(
+        'https://web.archive.org/web/20260411201239/http://web.archive.org/screenshot/https://edgehillrecovery.org',
+        'https://web.archive.org/web/20260411201239/https://edgehillrecovery.org/'
+      )
+    ).toBe(false)
+  })
+
+  it('rejects the bare archive.org homepage', () => {
+    expect(
+      isSameDomain(
+        'https://web.archive.org/',
+        'https://web.archive.org/web/20260411201239/https://edgehillrecovery.org/'
+      )
+    ).toBe(false)
+  })
+})
+
+describe('unwrapWaybackUrl', () => {
+  it('extracts the original url from a wayback snapshot url', () => {
+    expect(
+      unwrapWaybackUrl('https://web.archive.org/web/20260411201239/https://edgehillrecovery.org/about')
+    ).toBe('https://edgehillrecovery.org/about')
+  })
+
+  it('handles wayback modifier flags like im_ and id_', () => {
+    expect(
+      unwrapWaybackUrl('https://web.archive.org/web/20260411201239im_/https://edgehillrecovery.org/style.css')
+    ).toBe('https://edgehillrecovery.org/style.css')
+  })
+
+  it('returns non-wayback urls unchanged', () => {
+    expect(unwrapWaybackUrl('https://example.com/about')).toBe('https://example.com/about')
+  })
+
+  it('returns the calendar snapshot picker url unchanged (does not match the pattern)', () => {
+    const url = 'https://web.archive.org/web/20260411201239*/https://edgehillrecovery.org'
+    expect(unwrapWaybackUrl(url)).toBe(url)
   })
 })
 
@@ -105,6 +174,24 @@ describe('isNavigableUrl', () => {
 
   it('rejects empty string', () => {
     expect(isNavigableUrl('', root)).toBe(false)
+  })
+
+  it('accepts other snapshot timestamps of the same site when crawling via wayback', () => {
+    const waybackRoot = 'https://web.archive.org/web/20260411201239/https://edgehillrecovery.org/'
+    expect(
+      isNavigableUrl(
+        'https://web.archive.org/web/20240101000000/https://edgehillrecovery.org/about',
+        waybackRoot
+      )
+    ).toBe(true)
+  })
+
+  it('rejects wayback toolbar chrome when crawling via wayback', () => {
+    const waybackRoot = 'https://web.archive.org/web/20260411201239/https://edgehillrecovery.org/'
+    expect(
+      isNavigableUrl('https://web.archive.org/web/20260411201239*/https://edgehillrecovery.org', waybackRoot)
+    ).toBe(false)
+    expect(isNavigableUrl('https://web.archive.org/', waybackRoot)).toBe(false)
   })
 })
 
