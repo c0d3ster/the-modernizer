@@ -144,7 +144,17 @@ export const generateWithClaude = async (schema: SiteSchema, outDir: string, ver
     messages: [{ role: 'user', content: prompt }],
   })
 
-  const response = await stream.finalMessage()
+  let streamedChars = 0
+  stream.on('inputJson', (partialJson) => {
+    streamedChars += partialJson.length
+  })
+
+  const heartbeat = setInterval(() => {
+    process.stdout.write(`  ...still generating (${streamedChars.toLocaleString()} chars streamed)
+`)
+  }, 5_000)
+
+  const response = await stream.finalMessage().finally(() => clearInterval(heartbeat))
 
   const toolUse = response.content.find(b => b.type === 'tool_use' && b.name === 'write_files')
   if (!toolUse || toolUse.type !== 'tool_use') {
