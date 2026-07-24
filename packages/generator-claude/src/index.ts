@@ -1,15 +1,21 @@
 import { writeFile, mkdir } from 'node:fs/promises'
 import { join, dirname } from 'node:path'
 import Anthropic from '@anthropic-ai/sdk'
+import { z } from 'zod'
 import type { SiteSchema, ContentBlock } from '@modernizer/schema'
 
 const MODEL = 'claude-sonnet-4-5'
 const MAX_TOKENS = 64_000
+const MAX_ATTEMPTS = 3
 
-interface GeneratedFile {
-  path: string
-  content: string
-}
+const GeneratedFileSchema = z.object({
+  path: z.string(),
+  content: z.string(),
+})
+
+const WriteFilesInputSchema = z.object({
+  files: z.array(GeneratedFileSchema),
+})
 
 const serializeBlock = (block: ContentBlock): string => {
   if (block.type === 'generic_section') {
@@ -23,6 +29,20 @@ const serializeBlock = (block: ContentBlock): string => {
   }
   return JSON.stringify(block)
 }
+
+const WAYBACK_URL_PATTERN = /^https?:\/\/web\.archive\.org\/web\/\d{1,14}[a-z_]*\/(https?:\/\/.+)$/i
+const unwrapWaybackUrl = (url: string): string => url.match(WAYBACK_URL_PATTERN)?.[1] ?? url
+
+const urlToRoutePath = (url: string, baseUrl: string): string => {
+  const resolvedUrl = unwrapWaybackUrl(url)
+  const resolvedBase = unwrapWaybackUrl(baseUrl)
+  const { pathname } = new URL(resolvedUrl, resolvedBase)
+  const clean = pathname.replace(/\/$/, '')
+  return clean || '/'
+}
+
+const routePathToFilePath = (routePath: string): string =>
+  routePath === '/' ? 'src/app/page.tsx' : `src/app${routePath}/page.tsx`
 
 export const buildClaudePrompt = (schema: SiteSchema): string => {
   const { siteName, rootUrl, brandColors, pages, nav, tagline, footer } = schema
@@ -41,8 +61,9 @@ export const buildClaudePrompt = (schema: SiteSchema): string => {
   ).join('\n  ')
 
   const pagesStr = pages.map(p => {
+    const filePath = routePathToFilePath(urlToRoutePath(p.url, rootUrl))
     const blocks = p.blocks.map(b => `    ${serializeBlock(b)}`).join('\n')
-    return `### ${p.title} (${p.archetype})\nURL: ${p.url}\nBlocks:\n${blocks}`
+    return `### ${p.title} (${p.archetype})\nFile: ${filePath}\nBlocks:\n${blocks}`
   }).join('\n\n')
 
   return `You are generating a complete, production-quality Next.js 15 website from a structured content schema.
@@ -72,14 +93,14 @@ ${pagesStr}
 
 ## Required Files
 Generate ALL of the following:
-- package.json
+- package.json — include \`tailwindcss\` and \`@tailwindcss/postcss\` (v4), plus \`class-variance-authority\`, \`clsx\`, \`tailwind-merge\`, and \`@radix-ui/react-slot\` (the shadcn Button/Card/Badge components need these — do not inline shadcn components without also listing their real npm dependencies)
 - next.config.ts
 - tsconfig.json
-- postcss.config.mjs
+- postcss.config.mjs — MUST use \`{ plugins: { '@tailwindcss/postcss': {} } }\`. Do NOT use \`tailwindcss\` directly as a PostCSS plugin key — that only works on Tailwind v3 and will fail to build on v4.
 - src/app/globals.css
 - src/app/layout.tsx (Navbar + Footer)
 - src/app/page.tsx (home)
-- src/app/[slug]/page.tsx for every other page
+- One page.tsx file for every page listed in the Pages section above, at the exact File: path given for that page. Do NOT use Next.js dynamic route syntax like [slug] or [...slug] anywhere — every page gets its own real static file at its own real path.
 - src/components/ui/button.tsx, badge.tsx, card.tsx (shadcn inline)
 - src/components/layout/Navbar.tsx
 - src/components/layout/Footer.tsx
@@ -111,63 +132,78 @@ export const generateWithClaude = async (schema: SiteSchema, outDir: string, ver
     process.stdout.write(`  Model: ${MODEL}, max_tokens: ${MAX_TOKENS.toLocaleString()}\n`)
   }
 
-  process.stdout.write('  Calling Claude API...\n')
+  let files: z.infer<typeof GeneratedFileSchema>[] | undefined
+  let outputTokens = 0
 
-  const stream = client.messages.stream({
-    model: MODEL,
-    max_tokens: MAX_TOKENS,
-    system: 'You are an expert frontend engineer. Always call write_files with the complete generated file tree.',
-    tools: [
-      {
-        name: 'write_files',
-        description: 'Write all generated project files to disk',
-        input_schema: {
-          type: 'object' as const,
-          properties: {
-            files: {
-              type: 'array',
-              items: {
-                type: 'object',
-                properties: {
-                  path: { type: 'string', description: 'File path relative to project root (e.g. src/app/page.tsx)' },
-                  content: { type: 'string', description: 'Full file content' },
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS && !files; attempt++) {
+      process.stdout.write(attempt === 1 ? '  Calling Claude API...\n' : '  Retrying after malformed response...\n')
+
+    const stream = client.messages.stream({
+      model: MODEL,
+      max_tokens: MAX_TOKENS,
+      system: 'You are an expert frontend engineer. Always call write_files with the complete generated file tree.',
+      tools: [
+        {
+          name: 'write_files',
+          description: 'Write all generated project files to disk',
+          input_schema: {
+            type: 'object' as const,
+            properties: {
+              files: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    path: { type: 'string', description: 'File path relative to project root (e.g. src/app/page.tsx)' },
+                    content: { type: 'string', description: 'Full file content' },
+                  },
+                  required: ['path', 'content'],
                 },
-                required: ['path', 'content'],
               },
             },
+            required: ['files'],
           },
-          required: ['files'],
         },
-      },
-    ],
-    tool_choice: { type: 'tool', name: 'write_files' },
-    messages: [{ role: 'user', content: prompt }],
-  })
+      ],
+      tool_choice: { type: 'tool', name: 'write_files' },
+      messages: [{ role: 'user', content: prompt }],
+    })
 
-  let streamedChars = 0
-  stream.on('inputJson', (partialJson) => {
-    streamedChars += partialJson.length
-  })
+    let streamedChars = 0
+    stream.on('inputJson', (partialJson) => {
+      streamedChars += partialJson.length
+    })
 
-  const heartbeat = setInterval(() => {
-    process.stdout.write(`  ...still generating (${streamedChars.toLocaleString()} chars streamed)
-`)
-  }, 5_000)
+    const heartbeat = setInterval(() => {
+      process.stdout.write(`  ...still generating (${streamedChars.toLocaleString()} chars streamed)\n`)
+    }, 15_000)
 
-  const response = await stream.finalMessage().finally(() => clearInterval(heartbeat))
+    const response = await stream.finalMessage().finally(() => clearInterval(heartbeat))
 
-  const toolUse = response.content.find(b => b.type === 'tool_use' && b.name === 'write_files')
-  if (!toolUse || toolUse.type !== 'tool_use') {
-    throw new Error('Claude did not return a write_files tool call')
+    const toolUse = response.content.find(b => b.type === 'tool_use' && b.name === 'write_files')
+    if (!toolUse || toolUse.type !== 'tool_use') {
+      if (attempt === MAX_ATTEMPTS) throw new Error('Claude did not return a write_files tool call')
+      continue
+    }
+
+    const parsed = WriteFilesInputSchema.safeParse(toolUse.input)
+    if (!parsed.success) {
+      if (attempt === MAX_ATTEMPTS) {
+        throw new Error(`Claude returned malformed files (stop_reason: ${response.stop_reason}): ${parsed.error.message}`)
+      }
+      continue
+    }
+
+    files = parsed.data.files
+    outputTokens = response.usage.output_tokens
+
+    if (verbose) {
+      process.stdout.write(`  Writing ${files.length} files...\n`)
+      process.stdout.write(`  Stop reason: ${response.stop_reason}, output tokens: ${outputTokens.toLocaleString()}\n`)
+    }
   }
 
-  const { files } = toolUse.input as { files: GeneratedFile[] }
-
-  if (verbose) {
-    process.stdout.write(`  Writing ${files.length} files...\n`)
-    process.stdout.write(`  Stop reason: ${response.stop_reason}, output tokens: ${response.usage.output_tokens.toLocaleString()}\n`)
-  }
-
+  if (!files) throw new Error('Claude failed to return valid files')
   await Promise.all(
     files.map(async ({ path, content }) => {
       const fullPath = join(outDir, path)
@@ -176,5 +212,5 @@ export const generateWithClaude = async (schema: SiteSchema, outDir: string, ver
     })
   )
 
-  process.stdout.write(`  Wrote ${files.length} files (${response.usage.output_tokens.toLocaleString()} output tokens)\n`)
+  process.stdout.write(`  Wrote ${files.length} files (${outputTokens.toLocaleString()} output tokens)\n`)
 }

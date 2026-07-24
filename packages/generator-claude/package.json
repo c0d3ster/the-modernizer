@@ -19,6 +19,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
-    "@modernizer/schema": "workspace:*"
+    "@modernizer/schema": "workspace:*",
+    "zod": "^3.24.2"
   }
 }
