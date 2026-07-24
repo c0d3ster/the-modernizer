@@ -10,7 +10,6 @@ import { extract, getUsageStats } from '@modernizer/extractor'
 import { generateSite } from '@modernizer/generator-local'
 import { siteSchemaSchema } from '@modernizer/schema'
 import { generateLovable } from '@modernizer/generator-lovable'
-import { generateWithClaude } from '@modernizer/generator-claude'
 
 const slugify = (name: string): string =>
   name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
@@ -29,7 +28,6 @@ program
   .option('--from-schema <file>', 'skip crawl/extract and load from a saved schema JSON')
   .option('--primary-color <hex>', 'override auto-detected brand color (e.g. #2563eb)')
   .option('--lovable', 'generate via Lovable browser (default when no generator flag is set)', false)
-  .option('--claude', 'generate via Claude API (requires ANTHROPIC_API_KEY in .env)', false)
   .option('--local', 'generate a local Next.js project using the deterministic template generator', false)
   .option('--verbose', 'detailed logging', false)
   .option(
@@ -45,7 +43,6 @@ program.action(async (url: string | undefined, opts: {
   fromSchema?: string
   primaryColor?: string
   lovable: boolean
-  claude: boolean
   local: boolean
   verbose: boolean
   headless?: boolean
@@ -71,14 +68,6 @@ program.action(async (url: string | undefined, opts: {
         log(`Generating: ${schema.siteName} (${schema.pages.length} pages)`)
         await mkdir(outDir, { recursive: true })
         await generateSite(schema, outDir)
-        const displayDir = (opts.output ?? outDir).replace(/\\/g, '/')
-        log(`\nDone! Output: ${displayDir}`)
-        log(`  cd ${displayDir} && npm install && npm run dev`)
-      } else if (opts.claude) {
-        const outDir = resolve(opts.output ?? join('.generated', slugify(schema.siteName)))
-        log(`Generating via Claude API: ${schema.siteName} (${schema.pages.length} pages)`)
-        await mkdir(outDir, { recursive: true })
-        await generateWithClaude(schema, outDir, verbose)
         const displayDir = (opts.output ?? outDir).replace(/\\/g, '/')
         log(`\nDone! Output: ${displayDir}`)
         log(`  cd ${displayDir} && npm install && npm run dev`)
@@ -133,12 +122,6 @@ program.action(async (url: string | undefined, opts: {
     if (opts.local) {
       log(`Generating site...`)
       await generateSite(schema, outDir)
-      const displayDir = (opts.output ?? outDir).replace(/\\/g, '/')
-      log(`\nDone! Output: ${displayDir}`)
-      log(`  cd ${displayDir} && npm install && npm run dev`)
-    } else if (opts.claude) {
-      log(`Generating via Claude API: ${schema.siteName} (${schema.pages.length} pages)`)
-      await generateWithClaude(schema, outDir, verbose)
       const displayDir = (opts.output ?? outDir).replace(/\\/g, '/')
       log(`\nDone! Output: ${displayDir}`)
       log(`  cd ${displayDir} && npm install && npm run dev`)

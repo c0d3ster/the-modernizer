@@ -16,14 +16,13 @@ Crawl → Extract → Schema JSON → Generate
 |---|---|---|
 | Crawl | `@modernizer/crawler` | Discovers and fetches all pages on a target site |
 | Extract | `@modernizer/extractor` | Converts raw HTML into structured page schemas using deterministic parsing + LLM classification |
-| Generate | see below | Three generator options depending on use case |
+| Generate | see below | Two generator options depending on use case |
 
 ## Generator Modes
 
 | Flag | Package | Description |
 |---|---|---|
 | _(default)_ or `--lovable` | `@modernizer/generator-lovable` | Builds a prompt from the schema and opens `lovable.dev` in the browser with `?autosubmit=true`. No API key required — the user logs into Lovable and the project builds automatically. |
-| `--claude` | `@modernizer/generator-claude` | Calls the Claude API with a `write_files` tool to generate a complete Next.js project on disk. Requires `ANTHROPIC_API_KEY` in `.env`. |
 | `--local` | `@modernizer/generator-local` | Writes a complete Next.js project to disk using a deterministic template generator and pre-built block components. No API key required. |
 
 ## Usage
@@ -33,7 +32,6 @@ pnpm modernize <url> [options]
 
 # Generator flags (default is Lovable)
 --lovable            Open Lovable in browser (default)
---claude             Generate locally via Claude API
 --local              Generate locally via template generator
 
 # Pipeline options
@@ -53,20 +51,17 @@ pnpm modernize <url> [options]
 # Lovable (default) — opens browser, builds automatically
 pnpm modernize https://example.com
 
-# Claude API — writes Next.js project to disk
-pnpm modernize https://example.com --claude --output .generated/example
-
 # Local template — no API key needed
 pnpm modernize https://example.com --local --output .generated/example
 
 # Save schema only, generate later
 pnpm modernize https://example.com --schema-only --output ./fixtures
-pnpm modernize --from-schema ./fixtures/schema.json --claude
+pnpm modernize --from-schema ./fixtures/schema.json --local --output .generated/example
 ```
 
 ## Comparing Generators
 
-Use `pnpm generate-compare` to run all three generators against the same schema and compare outputs side by side. This is the recommended way to evaluate quality differences before pitching to a client.
+Use `pnpm generate-compare` to run all generators against the same schema and compare outputs side by side. This is the recommended way to evaluate quality differences before pitching to a client.
 
 ```bash
 pnpm generate-compare [-- path/to/schema.json]
@@ -92,7 +87,6 @@ pnpm generate-compare
 
 Outputs:
 - `.generated/edgehill-local` — local template output (`npm install && npm run dev`)
-- `.generated/edgehill-claude` — Claude API output (`npm install && npm run dev`)
 - Lovable — opens in browser automatically
 
 ## Packages
@@ -103,7 +97,6 @@ Outputs:
 | `@modernizer/crawler` | Site crawler |
 | `@modernizer/extractor` | Content extractor |
 | `@modernizer/generator-lovable` | Lovable Build-with-URL generator |
-| `@modernizer/generator-claude` | Claude API generator |
 | `@modernizer/generator-local` | Deterministic template generator |
 | `@modernizer/ui` | Block component library (shadcn/ui primitives + layout components) |
 
@@ -124,5 +117,5 @@ pnpm lint          # Lint all packages
 pnpm check-types   # Type-check all packages
 pnpm test          # Run tests
 pnpm format        # Format all files with Prettier
-pnpm generate-compare  # Run all three generators against the fixture schema
+pnpm generate-compare  # Run all generators against the fixture schema
 ```

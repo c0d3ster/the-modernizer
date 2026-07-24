@@ -25,7 +25,6 @@
     "@modernizer/crawler": "workspace:*",
     "@modernizer/extractor": "workspace:*",
     "@modernizer/generator-local": "workspace:*",
-    "@modernizer/generator-claude": "workspace:*",
     "@modernizer/generator-lovable": "workspace:*",
     "@modernizer/schema": "workspace:*",
     "commander": "^14.0.3",
