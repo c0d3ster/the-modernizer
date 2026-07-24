@@ -1,6 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk'
 
-const MODEL = 'claude-sonnet-4-20250514'
+const MODEL = 'claude-sonnet-4-5'
 
 // Sonnet pricing (per million tokens, as of 2025)
 const COST_PER_M_INPUT = 3.0

@@ -1,10 +1,12 @@
 import type { SiteSchema, BrandColors, NavItem } from '@modernizer/schema'
+import { unwrapWaybackUrl } from './wayback-utils.js'
 
 const toRelative = (url: string, baseUrl: string): string | null => {
   if (!url || url === '#') return null
   try {
-    const origin = new URL(baseUrl).origin
-    const parsed = new URL(url, baseUrl)
+    const resolvedBase = unwrapWaybackUrl(baseUrl)
+    const origin = new URL(resolvedBase).origin
+    const parsed = new URL(unwrapWaybackUrl(url), resolvedBase)
     if (parsed.origin === origin) return parsed.pathname.replace(/\/$/, '') || '/'
     return url
   } catch {
@@ -14,7 +16,8 @@ const toRelative = (url: string, baseUrl: string): string | null => {
 
 const isExternalHref = (href: string, baseUrl: string): boolean => {
   try {
-    return new URL(href, baseUrl).origin !== new URL(baseUrl).origin
+    const resolvedBase = unwrapWaybackUrl(baseUrl)
+    return new URL(unwrapWaybackUrl(href), resolvedBase).origin !== new URL(resolvedBase).origin
   } catch {
     return false
   }
@@ -33,7 +36,8 @@ const MAX_CHILDREN_PER_GROUP = 5
  * - caps total top-level items at navMaxItems
  */
 export const buildNav = (nav: NavItem[], rootUrl: string, pagePathnames: Set<string>, navMaxItems: number): NavItem[] => {
-  const origin = new URL(rootUrl).origin
+  const resolvedRootUrl = unwrapWaybackUrl(rootUrl)
+  const origin = new URL(resolvedRootUrl).origin
   const seenUrls = new Set<string>(['/', '']) // pre-seed homepage so it's always excluded
 
   const processChild = (child: NavItem): NavItem | null => {
@@ -41,7 +45,7 @@ export const buildNav = (nav: NavItem[], rootUrl: string, pagePathnames: Set<str
     if (!childUrl) return null
     let internalPath: string | null = null
     try {
-      const p = new URL(child.url, rootUrl)
+      const p = new URL(unwrapWaybackUrl(child.url), resolvedRootUrl)
       if (p.origin === origin) internalPath = p.pathname.replace(/\/$/, '') || '/'
     } catch {
       return null
@@ -107,10 +111,11 @@ export const flattenNav = (nav: NavItem[], rootUrl: string): Array<{ label: stri
 export const generateLayout = (schema: SiteSchema): string => {
   const { siteName, nav, tagline, rootUrl, pages } = schema
   const navMaxItems = schema.generator?.navMaxItems ?? 7
+  const resolvedRootUrl = unwrapWaybackUrl(rootUrl)
   const pagePathnames = new Set(
     pages.map((p) => {
       try {
-        return new URL(p.url, rootUrl).pathname.replace(/\/$/, '') || '/'
+        return new URL(unwrapWaybackUrl(p.url), resolvedRootUrl).pathname.replace(/\/$/, '') || '/'
       } catch {
         return p.url
       }

@@ -1,9 +1,9 @@
 // Dev script — runs the generator against a saved SiteSchema fixture.
 //
 // Usage:
-//   pnpm --filter @modernizer/generator generate
-//   pnpm --filter @modernizer/generator generate --schema packages/extractor/fixtures/edgehill-schema-v5.json
-//   pnpm --filter @modernizer/generator generate --schema <path> --out <dir>
+//   pnpm --filter @modernizer/generator-local generate
+//   pnpm --filter @modernizer/generator-local generate --schema packages/extractor/fixtures/edgehill-schema-v5.json
+//   pnpm --filter @modernizer/generator-local generate --schema <path> --out <dir>
 
 import { readFile } from 'node:fs/promises'
 import { resolve, dirname } from 'node:path'

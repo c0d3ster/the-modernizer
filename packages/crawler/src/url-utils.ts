@@ -8,6 +8,16 @@ const ASSET_EXTENSIONS = new Set([
   '.xml', '.json', '.csv',
 ])
 
+// Matches web.archive.org/web/{timestamp}{modifier}/{original-url} and captures the original URL.
+// Wayback's own chrome (donate banner, calendar picker, screenshot endpoint, bare archive.org
+// links) doesn't fit this shape, so it falls through unwrapped and fails the domain check below.
+const WAYBACK_URL_PATTERN = /^https?:\/\/web\.archive\.org\/web\/\d{1,14}[a-z_]*\/(https?:\/\/.+)$/i
+
+export const unwrapWaybackUrl = (url: string): string => {
+  const match = url.match(WAYBACK_URL_PATTERN)
+  return match?.[1] ?? url
+}
+
 export const normalizeUrl = (url: string): string => {
   try {
     const parsed = new URL(url)
@@ -25,8 +35,8 @@ export const normalizeUrl = (url: string): string => {
 
 export const isSameDomain = (url: string, rootUrl: string): boolean => {
   try {
-    const parsed = new URL(url)
-    const root = new URL(rootUrl)
+    const parsed = new URL(unwrapWaybackUrl(url))
+    const root = new URL(unwrapWaybackUrl(rootUrl))
     return parsed.hostname === root.hostname
   } catch {
     return false

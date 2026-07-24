@@ -29,9 +29,12 @@ importers:
       '@modernizer/extractor':
         specifier: workspace:*
         version: link:../../packages/extractor
-      '@modernizer/generator':
+      '@modernizer/generator-local':
         specifier: workspace:*
-        version: link:../../packages/generator
+        version: link:../../packages/generator-local
+      '@modernizer/generator-lovable':
+        specifier: workspace:*
+        version: link:../../packages/generator-lovable
       '@modernizer/schema':
         specifier: workspace:*
         version: link:../../packages/schema
@@ -220,7 +223,7 @@ importers:
         specifier: ^4.1.2
         version: 4.1.2(@types/node@22.15.3)(vite@8.0.3(@emnapi/core@1.9.2)(@emnapi/runtime@1.7.1)(@types/node@22.15.3)(esbuild@0.27.7)(jiti@2.6.1)(tsx@4.21.0))
 
-  packages/generator:
+  packages/generator-local:
     dependencies:
       '@modernizer/schema':
         specifier: workspace:*
@@ -253,6 +256,28 @@ importers:
       vitest:
         specifier: ^4.1.2
         version: 4.1.2(@types/node@22.15.3)(vite@8.0.3(@emnapi/core@1.9.2)(@emnapi/runtime@1.7.1)(@types/node@22.15.3)(esbuild@0.27.7)(jiti@2.6.1)(tsx@4.21.0))
+
+  packages/generator-lovable:
+    dependencies:
+      '@modernizer/schema':
+        specifier: workspace:*
+        version: link:../schema
+    devDependencies:
+      '@modernizer/eslint-config':
+        specifier: workspace:*
+        version: link:../eslint-config
+      '@modernizer/typescript-config':
+        specifier: workspace:*
+        version: link:../typescript-config
+      '@types/node':
+        specifier: ^22.15.3
+        version: 22.15.3
+      eslint:
+        specifier: ^9.39.1
+        version: 9.39.1(jiti@2.6.1)
+      typescript:
+        specifier: 5.9.2
+        version: 5.9.2
 
   packages/schema:
     dependencies:

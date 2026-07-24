@@ -2,6 +2,13 @@
 
 export { crawl } from './crawler.js'
 export { resolvePlaywrightHeadless } from './playwright-fetcher.js'
-export { normalizeUrl, isSameDomain, isAssetUrl, isNavigableUrl, deduplicateUrls } from './url-utils.js'
+export {
+  normalizeUrl,
+  isSameDomain,
+  isAssetUrl,
+  isNavigableUrl,
+  deduplicateUrls,
+  unwrapWaybackUrl,
+} from './url-utils.js'
 export { extractLinks, extractImages, extractTitle } from './link-extractor.js'
 export type { CrawlResult, CrawlOptions, FetchMethod } from './types.js'

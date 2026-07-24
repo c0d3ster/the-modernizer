@@ -8,7 +8,8 @@
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "check-types": "turbo run check-types",
     "test": "turbo run test",
-    "modernize": "tsx apps/cli/src/index.ts"
+    "modernize": "tsx apps/cli/src/index.ts",
+    "generate-compare": "bash scripts/compare-generators.sh"
   },
   "devDependencies": {
     "prettier": "^3.7.4",
