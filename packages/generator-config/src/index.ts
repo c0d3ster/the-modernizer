@@ -6,4 +6,5 @@ export {
   generatePostcss,
   generatePrettier,
   generateEslint,
+  generateGlobalsCss,
 } from './config-generator.js'

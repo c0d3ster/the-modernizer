@@ -8,8 +8,10 @@ import {
   generateNextConfig,
   generateTsConfig,
   generatePostcss,
+  generateGlobalsCss,
   collectImageHostnames,
 } from '@modernizer/generator-config'
+import { copyDeterministicComponents } from './component-copier.js'
 
 const MODEL = 'claude-sonnet-4-5'
 const MAX_TOKENS = 64_000
@@ -94,24 +96,26 @@ ${pagesStr}
 ## Tech Stack
 - Next.js 15 App Router, React 19, TypeScript strict mode
 - Tailwind CSS v4 — use \`@import "tailwindcss"\` + \`@theme { }\` in globals.css (no tailwind.config.js)
-- shadcn/ui (Button, Card, Badge, etc.) — inline the component source, do NOT import from a registry
-- lucide-react for icons
+- shadcn/ui (Button, Card, Badge, Accordion, Avatar, Separator) — already provided, see below
+- lucide-react for icons — only import icon names that actually exist in the package. Do not guess at plausible-sounding names (there is no \`Fax\`, for example — use \`Printer\` or \`Phone\` instead). If unsure whether an icon exists, use a common one you're confident about (Phone, Mail, MapPin, Clock, Check, X, Menu, ChevronDown, ArrowRight, Star, Users, Calendar, Facebook, Twitter, Instagram, Linkedin).
 - Mobile-first responsive design
 
 ## Already Provided
-package.json, next.config.ts, tsconfig.json, and postcss.config.mjs are generated separately and already correct — do NOT generate these files. Assume \`class-variance-authority\`, \`clsx\`, \`tailwind-merge\`, \`lucide-react\`, and the \`@radix-ui/*\` packages needed for inlined shadcn components (Slot, Accordion, Avatar, Separator) are already installed.
+These files are generated deterministically and already correct — do NOT generate them, and do NOT redefine the components they export:
+- package.json, next.config.ts, tsconfig.json, postcss.config.mjs
+- src/app/globals.css — defines the full shadcn CSS variable theme (\`--color-primary\`, \`--color-card\`, \`--color-border\`, etc.) mapped from the site's brand colors, plus \`@layer base\` rules. Use Tailwind classes like \`bg-primary\`, \`text-primary-foreground\`, \`bg-card\`, \`border\`, \`bg-muted\`, \`text-muted-foreground\`, \`bg-accent\` throughout for consistent theming — do not invent your own color variables or write a competing global CSS reset.
+- src/lib/utils.ts (cn helper)
+- src/components/ui/button.tsx, badge.tsx, card.tsx, accordion.tsx, avatar.tsx, separator.tsx (shadcn primitives, with \`asChild\`/Slot support where applicable) — import them from \`@/components/ui/<name>\`, do not redeclare them
+Assume \`class-variance-authority\`, \`clsx\`, \`tailwind-merge\`, \`lucide-react\`, and the \`@radix-ui/*\` packages are already installed.
 
 ## Required Files
 Generate ALL of the following:
-- src/app/globals.css
 - src/app/layout.tsx (Navbar + Footer)
 - src/app/page.tsx (home)
 - One page.tsx file for every page listed in the Pages section above, at the exact File: path given for that page. Do NOT use Next.js dynamic route syntax like [slug] or [...slug] anywhere — every page gets its own real static file at its own real path.
-- src/components/ui/button.tsx, badge.tsx, card.tsx (shadcn inline)
 - src/components/layout/Navbar.tsx
 - src/components/layout/Footer.tsx
-- src/lib/utils.ts (cn helper)
-- Any additional component files you need
+- Any additional component files you need (composing the provided shadcn primitives above)
 
 ## Quality Bar
 - Use the brand colors meaningfully throughout — hero backgrounds, buttons, accents
@@ -211,14 +215,17 @@ export const generateWithClaude = async (schema: SiteSchema, outDir: string, ver
 
   if (!files) throw new Error('Claude failed to return valid files')
 
-  const configPaths = new Set(['package.json', 'next.config.ts', 'tsconfig.json', 'postcss.config.mjs'])
-  const configFiles: z.infer<typeof GeneratedFileSchema>[] = [
+  const deterministicComponents = await copyDeterministicComponents()
+  const deterministicFiles: z.infer<typeof GeneratedFileSchema>[] = [
     { path: 'package.json', content: generatePackageJson(schema) },
     { path: 'next.config.ts', content: generateNextConfig(collectImageHostnames(schema)) },
     { path: 'tsconfig.json', content: generateTsConfig() },
     { path: 'postcss.config.mjs', content: generatePostcss() },
+    { path: 'src/app/globals.css', content: generateGlobalsCss(schema.brandColors) },
+    ...deterministicComponents,
   ]
-  const allFiles = [...configFiles, ...files.filter((f) => !configPaths.has(f.path))]
+  const deterministicPaths = new Set(deterministicFiles.map((f) => f.path))
+  const allFiles = [...deterministicFiles, ...files.filter((f) => !deterministicPaths.has(f.path))]
 
   await Promise.all(
     allFiles.map(async ({ path, content }) => {

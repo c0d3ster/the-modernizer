@@ -21,7 +21,7 @@ export const TestimonialBlock = ({ block }: TestimonialBlockProps): React.ReactE
           {testimonials.map((t, i) => (
             <Card key={i}>
               <CardContent className="pt-6">
-                <blockquote className="mb-4 italic text-muted-foreground">"{t.quote}"</blockquote>
+                <blockquote className="mb-4 italic text-muted-foreground">&ldquo;{t.quote}&rdquo;</blockquote>
                 <div className="flex items-center gap-3">
                   <Avatar className="h-9 w-9">
                     {t.avatarUrl && <AvatarImage src={t.avatarUrl} alt={t.author} />}

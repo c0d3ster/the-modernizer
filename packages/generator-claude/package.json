@@ -21,6 +21,7 @@
     "@anthropic-ai/sdk": "^0.39.0",
     "@modernizer/generator-config": "workspace:*",
     "@modernizer/schema": "workspace:*",
+    "@modernizer/ui": "workspace:*",
     "zod": "^3.24.2"
   }
 }

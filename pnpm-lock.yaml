@@ -237,6 +237,9 @@ importers:
       '@modernizer/schema':
         specifier: workspace:*
         version: link:../schema
+      '@modernizer/ui':
+        specifier: workspace:*
+        version: link:../ui
       zod:
         specifier: ^3.24.2
         version: 3.25.76

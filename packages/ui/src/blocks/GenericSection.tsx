@@ -16,7 +16,7 @@ export const GenericSection = ({ block }: GenericSectionProps): React.ReactEleme
           <h2 className="mb-6 text-3xl font-bold tracking-tight text-primary lg:text-4xl">{heading}</h2>
         )}
         <div
-          className="prose prose-lg max-w-none text-muted-foreground"
+          className="max-w-none text-muted-foreground"
           dangerouslySetInnerHTML={{ __html: rawHtml }}
         />
       </div>

@@ -1,6 +1,7 @@
 'use client'
 
 import * as React from 'react'
+import Link from 'next/link'
 import type { NavItem } from '@modernizer/schema'
 import { Button } from '../shadcn/button'
 import { cn } from '../lib/cn'
@@ -111,9 +112,9 @@ export const Navbar = ({ siteName, nav, ctaText, ctaUrl }: NavbarProps): React.R
   return (
     <header className="sticky top-0 z-50 border-b border-primary/15 bg-primary text-primary-foreground shadow-sm">
       <div className={cn(container, 'flex h-16 items-center justify-between')}>
-        <a href="/" className="text-lg font-bold tracking-tight text-primary-foreground">
+        <Link href="/" className="text-lg font-bold tracking-tight text-primary-foreground">
           {siteName}
-        </a>
+        </Link>
 
         {/* desktop nav */}
         <nav className="hidden items-center gap-6 md:flex">
