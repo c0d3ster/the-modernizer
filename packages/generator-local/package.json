@@ -22,6 +22,7 @@
     "vitest": "^4.1.2"
   },
   "dependencies": {
+    "@modernizer/generator-config": "workspace:*",
     "@modernizer/schema": "workspace:*",
     "@modernizer/ui": "workspace:*",
     "cheerio": "^1.2.0"

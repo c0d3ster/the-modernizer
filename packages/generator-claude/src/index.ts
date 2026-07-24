@@ -3,6 +3,13 @@ import { join, dirname } from 'node:path'
 import Anthropic from '@anthropic-ai/sdk'
 import { z } from 'zod'
 import type { SiteSchema, ContentBlock } from '@modernizer/schema'
+import {
+  generatePackageJson,
+  generateNextConfig,
+  generateTsConfig,
+  generatePostcss,
+  collectImageHostnames,
+} from '@modernizer/generator-config'
 
 const MODEL = 'claude-sonnet-4-5'
 const MAX_TOKENS = 64_000
@@ -91,12 +98,11 @@ ${pagesStr}
 - lucide-react for icons
 - Mobile-first responsive design
 
+## Already Provided
+package.json, next.config.ts, tsconfig.json, and postcss.config.mjs are generated separately and already correct — do NOT generate these files. Assume \`class-variance-authority\`, \`clsx\`, \`tailwind-merge\`, \`lucide-react\`, and the \`@radix-ui/*\` packages needed for inlined shadcn components (Slot, Accordion, Avatar, Separator) are already installed.
+
 ## Required Files
 Generate ALL of the following:
-- package.json — include \`tailwindcss\` and \`@tailwindcss/postcss\` (v4), plus \`class-variance-authority\`, \`clsx\`, \`tailwind-merge\`, and \`@radix-ui/react-slot\` (the shadcn Button/Card/Badge components need these — do not inline shadcn components without also listing their real npm dependencies)
-- next.config.ts
-- tsconfig.json
-- postcss.config.mjs — MUST use \`{ plugins: { '@tailwindcss/postcss': {} } }\`. Do NOT use \`tailwindcss\` directly as a PostCSS plugin key — that only works on Tailwind v3 and will fail to build on v4.
 - src/app/globals.css
 - src/app/layout.tsx (Navbar + Footer)
 - src/app/page.tsx (home)
@@ -204,13 +210,23 @@ export const generateWithClaude = async (schema: SiteSchema, outDir: string, ver
   }
 
   if (!files) throw new Error('Claude failed to return valid files')
+
+  const configPaths = new Set(['package.json', 'next.config.ts', 'tsconfig.json', 'postcss.config.mjs'])
+  const configFiles: z.infer<typeof GeneratedFileSchema>[] = [
+    { path: 'package.json', content: generatePackageJson(schema) },
+    { path: 'next.config.ts', content: generateNextConfig(collectImageHostnames(schema)) },
+    { path: 'tsconfig.json', content: generateTsConfig() },
+    { path: 'postcss.config.mjs', content: generatePostcss() },
+  ]
+  const allFiles = [...configFiles, ...files.filter((f) => !configPaths.has(f.path))]
+
   await Promise.all(
-    files.map(async ({ path, content }) => {
+    allFiles.map(async ({ path, content }) => {
       const fullPath = join(outDir, path)
       await mkdir(dirname(fullPath), { recursive: true })
       await writeFile(fullPath, content)
     })
   )
 
-  process.stdout.write(`  Wrote ${files.length} files (${outputTokens.toLocaleString()} output tokens)\n`)
+  process.stdout.write(`  Wrote ${allFiles.length} files (${outputTokens.toLocaleString()} output tokens)\n`)
 }
