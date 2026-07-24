@@ -176,9 +176,9 @@ Authorization: Bearer YOUR_API_KEY
 
 **Response fields to extract:**
 - `businesses[].url` — Yelp listing URL (need to follow to get actual website)
-- `businesses[].website` — direct website URL (not always present)
+- `businesses[].id` — use with the Business Details endpoint to fetch `website` (not returned by Search)
 
-**Note:** Yelp doesn't always return the business's own website URL in the API response. You may need to scrape the Yelp listing page for the external website link. This adds complexity — try Google Places first.
+**Note:** The Search endpoint does not include the business's own website URL. Call `GET /v3/businesses/{id}` for `website`, or scrape the Yelp listing page for the external link. This adds complexity — try Google Places first.
 
 ---
 
@@ -207,7 +207,7 @@ Stage 2 — Route by website presence
   ↓
 Stage 3 — HTML fetch + static scoring
   → fetch homepage HTML (plain GET, no JS)
-  → score against static signals (viewport, copyright, WP theme, OG tags, tables, SSL)
+  → score against static signals (viewport, copyright, WP theme, OG tags, tables, SSL, old jQuery, IE meta)
   ↓
 Stage 4 — Lighthouse / PSI scoring
   → call PSI API for mobile performance, SEO, and accessibility scores
@@ -324,7 +324,7 @@ GET https://www.googleapis.com/pagespeedonline/v5/runPagespeed
 psi_score = (performance × 0.30) + (seo × 0.40) + (accessibility × 0.30)
 ```
 
-All three are already 0-100, so the result is always in range.
+After multiplying the raw API scores by 100, all three inputs are 0-100, so `psi_score` is always in range.
 
 **Cost:** Free with a Google Cloud API key. Rate limit: 25,000 queries/day.
 
@@ -381,9 +381,11 @@ Businesses with an existing website, sorted by modernity score ascending — low
 | `no_ssl` | boolean | HTTPS fetch failed or cert error |
 | `no_viewport` | boolean | Missing viewport meta tag |
 | `last_changed` | date | True last-updated date from Wayback CDX |
+| `old_jquery` | boolean | jQuery 1.x or 2.x detected in script src |
 | `old_wp_theme` | boolean | Old default WordPress theme detected |
 | `no_og_tags` | boolean | No Open Graph meta tags |
 | `table_layout` | boolean | Tables used for page layout |
+| `ie_compatible` | boolean | X-UA-Compatible meta tag present |
 | `static_score` | 0-100 | Normalized static HTML sub-score |
 | `psi_score` | 0-100 | Weighted Lighthouse sub-score (performance 30%, SEO 40%, accessibility 30%) |
 | `psi_performance` | 0-100 | Raw Lighthouse mobile performance score |
