@@ -24,12 +24,10 @@ Three-stage pipeline: **Crawl > Extract > Generate**
 
 ## Conventions
 
-- TypeScript everywhere, strict mode
 - shadcn/ui for primitives (Button, Card, Badge, etc.) — stored in `packages/ui/src/shadcn/`, copied into output projects
 - Block components in `packages/ui/src/blocks/` — one per ContentBlock type, compose shadcn primitives
 - Zod validation on all LLM outputs, never trust raw JSON
 - All LLM calls use Anthropic tool use API (`callLlmWithTool`) with `thinking: disabled` and low effort for deterministic classification (claude-sonnet-5 rejects non-default `temperature`)
-- Vitest for testing
 - All styling via Tailwind CSS utility classes, no separate CSS files
 - Deterministic approaches first, LLM calls only for ambiguous classification/structuring
 - Store LLM prompts as template literal functions in dedicated files under `prompts/`
@@ -41,22 +39,6 @@ The Edgehill Recovery site (https://edgehillrecovery.org/) is the primary test f
 ## LLM Usage
 
 Use Anthropic SDK with model `claude-sonnet-5` for all LLM calls. Always validate responses with Zod. Failed blocks fall back to GenericSectionBlock.
-
-## CLI Quick Reference
-
-```
-npx the-modernizer <url> [options]
-
---local          Generate a Next.js project on disk instead of opening Lovable
---output <dir>   Output directory (used with --local)
---schema-only    Stop after extraction, output SiteSchema JSON only
---from-schema    Skip crawl/extract, generate from saved JSON
---download-assets  Fetch images to local public/ directory (--local only)
---style          Design preset: clean | minimal | warm | corporate (--local only)
---primary-color  Override auto-detected brand color
---max-pages      Max pages to crawl (default: 100)
---dry-run        Crawl and report structure without generating
-```
 
 ## Generation Modes
 
