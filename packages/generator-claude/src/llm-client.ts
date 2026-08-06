@@ -1,12 +1,13 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { z } from 'zod'
 
-const MODEL = 'claude-sonnet-4-5'
+const MODEL = 'claude-sonnet-5'
 const MAX_TOKENS = 16_000
 const MAX_ATTEMPTS = 3
 const HEARTBEAT_MS = 30_000
 
-// claude-sonnet-4-5 pricing per Anthropic's standard Sonnet-tier rate (same as Sonnet 4.6): $3/$15 per MTok.
+// claude-sonnet-5 standard Sonnet-tier rate: $3/$15 per MTok (discounted to $2/$10 through 2026-08-31 —
+// not reflected here since these constants should stay accurate after the intro window closes).
 // Cache write/read multipliers are the standard 1.25x / 0.1x of the input rate (5-minute ephemeral TTL).
 const INPUT_PRICE_PER_MTOK = 3.0
 const OUTPUT_PRICE_PER_MTOK = 15.0
@@ -109,6 +110,9 @@ export const callClaudeForFiles = async (prompt: PromptParts, label: string, ver
     const stream = getClient().messages.stream({
       model: MODEL,
       max_tokens: MAX_TOKENS,
+      // claude-sonnet-5 runs adaptive thinking by default when `thinking` is omitted (unlike 4.5, which
+      // never thought at all) — disabled explicitly to keep this call's cost/latency profile unchanged.
+      thinking: { type: 'disabled' },
       system: [{ type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
       tools: [WRITE_FILES_TOOL],
       tool_choice: { type: 'tool', name: 'write_files' },
