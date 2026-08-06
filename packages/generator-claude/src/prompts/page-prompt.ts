@@ -16,14 +16,19 @@ const serializeBlock = (block: ContentBlock): string => {
   return JSON.stringify(block)
 }
 
-/** Builds the prompt for a single page.tsx. The shell (layout/navbar/footer) is generated separately. */
-export const buildPagePrompt = (schema: SiteSchema, page: PageSchema): PromptParts => {
+/**
+ * Builds the prompt for a single page.tsx. The shell (layout/navbar/footer) is generated
+ * separately. `designSystemSpec` is the shell call's hand-off of the spacing/card/heading/button
+ * conventions it already decided on (see design-system.ts) — pass the same string for every page
+ * in a run so the cached block stays identical across all of them.
+ */
+export const buildPagePrompt = (schema: SiteSchema, page: PageSchema, designSystemSpec: string): PromptParts => {
   const { rootUrl } = schema
   const filePath = routePathToFilePath(urlToRoutePath(page.url, rootUrl))
   const blocks = page.blocks.map((b) => `  ${serializeBlock(b)}`).join('\n')
 
   return {
-    cached: buildSiteContextBlock(schema),
+    cached: buildSiteContextBlock(schema, designSystemSpec),
     task: `You are building a single page for this site.
 
 ## Page
@@ -42,10 +47,10 @@ ${blocks}
 Generate exactly one file: ${filePath} — the default-exported page component for this route. Do NOT use Next.js dynamic route syntax like [slug] or [...slug].
 
 ## Quality Bar
+- Follow the Design System section above exactly — same container/padding, section spacing, card style, heading scale, button conventions, and hero treatment as every other page. Do not invent your own variant of any of these; this page must look like it was built by the same person as the rest of the site
 - Use the brand colors meaningfully throughout — hero backgrounds, buttons, accents
 - Real content from the blocks above — no placeholders, no Lorem Ipsum
 - Semantic HTML, accessible (aria labels, alt text)
-- Smooth hover states and transitions
 - Generous whitespace, strong visual hierarchy
 
 Call write_files with this one file.`,

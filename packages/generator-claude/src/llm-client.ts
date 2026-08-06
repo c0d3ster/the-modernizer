@@ -129,12 +129,11 @@ export const callClaudeForFiles = async (prompt: PromptParts, label: string, ver
     })
 
     const attemptStartTime = Date.now()
+    const elapsedLabel = (): string => `${Math.round((Date.now() - attemptStartTime) / 1000)}s`
+
     const heartbeat = verbose
       ? setInterval(() => {
-          const elapsedSeconds = Math.round((Date.now() - attemptStartTime) / 1000)
-          process.stdout.write(
-            `  [${label}] ...still generating (${elapsedSeconds} seconds elapsed, ${streamedChars.toLocaleString()} chars streamed)\n`
-          )
+          process.stdout.write(`  [${label} - ${elapsedLabel()}] ...still generating (${streamedChars.toLocaleString()} chars streamed)\n`)
         }, HEARTBEAT_MS)
       : undefined
 
@@ -167,7 +166,9 @@ export const callClaudeForFiles = async (prompt: PromptParts, label: string, ver
     files = parsed.data.files
 
     if (verbose) {
-      process.stdout.write(`  [${label}] wrote ${files.length} file(s), ${response.usage.output_tokens.toLocaleString()} output tokens\n`)
+      process.stdout.write(
+        `  [${label} - ${elapsedLabel()}] wrote ${files.length} file(s), ${response.usage.output_tokens.toLocaleString()} output tokens\n`
+      )
     }
   }
 
