@@ -17,7 +17,7 @@ import {
   generatePrettier,
   generateEslint,
   collectImageHostnames,
-} from './config-generator.js'
+} from '@modernizer/generator-config'
 
 /** Files in `packages/generator/sample-assets/` are copied to `<output>/public/` (Next.js static URL root). */
 const copySampleAssetsToPublic = async (outputDir: string): Promise<void> => {

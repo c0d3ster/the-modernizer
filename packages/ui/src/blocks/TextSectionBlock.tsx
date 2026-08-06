@@ -15,7 +15,7 @@ export const TextSectionBlock = ({ block }: TextSectionBlockProps): React.ReactE
         {heading && (
           <h2 className="mb-6 text-3xl font-bold tracking-tight text-primary lg:text-4xl">{heading}</h2>
         )}
-        <div className="prose prose-lg max-w-none text-muted-foreground">
+        <div className="max-w-none space-y-4 text-muted-foreground">
           {body.split('\n\n').map((paragraph, i) => (
             <p key={i}>{paragraph}</p>
           ))}

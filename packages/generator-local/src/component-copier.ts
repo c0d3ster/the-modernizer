@@ -29,8 +29,20 @@ const copyDir = async (srcDir: string, destDir: string, transform = true): Promi
   )
 }
 
-// Schema source files to copy into src/types/schema/ (exclude test and validation files)
+// Schema source files to copy into src/types/schema/ (exclude test and validation files).
+// crawl.ts and validation.ts are intentionally excluded: the generated app only needs the
+// plain types, not crawl types or the zod validation schemas (which would also require
+// 'zod' as a runtime dependency of the generated project).
 const SCHEMA_FILES = ['blocks.ts', 'page.ts', 'site.ts', 'index.ts']
+
+// Drops re-exports pulled from excluded schema files so the copied index.ts doesn't
+// reference modules that were never copied alongside it. `[^}]*` (not `[\s\S]*?`) is
+// required: these export lists never nest braces, so bounding on the next `}` keeps each
+// replacement scoped to its own block instead of spanning across unrelated exports in between.
+const stripExcludedReexports = (source: string): string =>
+  source
+    .replace(/export\s+(?:type\s+)?\{[^}]*\}\s*from\s*'\.\/crawl\.js'\n*/g, '')
+    .replace(/export\s+(?:type\s+)?\{[^}]*\}\s*from\s*'\.\/validation\.js'\n*/g, '')
 
 const copySchemaTypes = async (outputDir: string): Promise<void> => {
   const destDir = join(outputDir, 'src/types/schema')
@@ -38,8 +50,9 @@ const copySchemaTypes = async (outputDir: string): Promise<void> => {
   await Promise.all(
     SCHEMA_FILES.map(async (file) => {
       const content = await readFile(join(SCHEMA_SRC, file), 'utf8')
+      const withoutExcludedReexports = file === 'index.ts' ? stripExcludedReexports(content) : content
       // Rewrite .js extension imports used in the schema package to extensionless
-      const cleaned = content.replace(/from '\.\/(\w+)\.js'/g, "from './$1'")
+      const cleaned = withoutExcludedReexports.replace(/from '\.\/(\w+)\.js'/g, "from './$1'")
       await writeFile(join(destDir, file), cleaned, 'utf8')
     })
   )
