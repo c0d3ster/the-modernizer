@@ -1,5 +1,6 @@
 import type { BrandColors, NavItem, SiteSchema } from '@modernizer/schema'
 import { relativizeNavItems } from '../route-utils.js'
+import { reconcileNav } from '../nav-reconciliation.js'
 
 export const formatColorInfo = (brandColors: BrandColors): string =>
   [
@@ -30,14 +31,23 @@ export const LINK_GUARDRAIL =
   'Every nav URL above is already a local route path on THIS Next.js site (e.g. `/about`), not a link to the original live site — use `next/link`\'s `Link` component with that exact path for all internal navigation (navbar, footer, buttons, CTAs). Never hardcode the original site\'s domain or absolute URL for an internal link. Only use a plain `<a>` with a full URL for links that are genuinely external (e.g. social media, third-party booking systems).'
 
 /**
- * The large, identical-across-every-call block of context (site info, nav, tech stack,
- * provided primitives). Shared verbatim by the shell prompt and every page prompt so it can be
- * marked as a cache_control breakpoint — only the first call in a generation run pays full
- * input-token price for it, every call after reads it from cache at ~10% of the cost.
+ * The large block of context (site info, nav, tech stack, provided primitives) shared by the
+ * shell prompt and every page prompt, marked as a cache_control breakpoint — only the first call
+ * to use a given version of this text pays full input-token price for it, every call after reads
+ * it from cache at ~10% of the cost.
+ *
+ * `designSystemSpec`, when provided, is appended as its own section. It's the shell call's
+ * hand-off of the spacing/card/heading/button conventions it already decided on (see
+ * design-system.ts) — every page call gets the identical spec text, so this is still one
+ * consistent cacheable block across all of them, just a different one than the shell used.
  */
-export const buildSiteContextBlock = (schema: SiteSchema): string => {
-  const { siteName, rootUrl, brandColors, nav, tagline, footer } = schema
-  const localNav = relativizeNavItems(nav, rootUrl)
+export const buildSiteContextBlock = (schema: SiteSchema, designSystemSpec?: string): string => {
+  const { siteName, rootUrl, brandColors, nav, pages, tagline, footer } = schema
+  // Nav is extracted from the site's own <nav> menu HTML; pages come from crawling
+  // independently, and the two can drift out of sync (a nav entry with no crawled page 404s;
+  // a crawled page with no nav entry is unreachable). Reconcile before handing nav to Claude
+  // so the generated Navbar never links to a route that doesn't exist.
+  const localNav = reconcileNav(relativizeNavItems(nav, rootUrl), pages, rootUrl)
 
   return `## Site
 - Name: ${siteName}
@@ -60,5 +70,8 @@ ${footer?.address ? `- Address: ${footer.address}` : ''}
 - Mobile-first responsive design
 
 ## Already Provided
-${PROVIDED_PRIMITIVES}`
+${PROVIDED_PRIMITIVES}${designSystemSpec ? `
+
+## Design System (already decided for this site — apply these exact conventions everywhere; do not invent new spacing, card, heading, or button conventions)
+${designSystemSpec}` : ''}`
 }

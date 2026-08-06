@@ -15,6 +15,7 @@ import { mapWithConcurrency } from './concurrency.js'
 import { buildShellPrompt } from './prompts/shell-prompt.js'
 import { buildPagePrompt } from './prompts/page-prompt.js'
 import { fillMissingHeroImages } from './hero-image.js'
+import { extractDesignSystemSpec } from './design-system.js'
 
 const PAGE_CONCURRENCY = 4
 
@@ -30,16 +31,37 @@ export const generateWithClaude = async (siteSchema: SiteSchema, outDir: string,
     process.stdout.write(`  ${schema.pages.length} pages, concurrency ${PAGE_CONCURRENCY}\n`)
   }
 
-  // The shell call and every page call share an identical, cache_control-marked site-context
-  // block (see prompts/shared.ts). Running the shell call first — instead of alongside the
-  // page calls — writes that cache entry before any page call fires, so all `pages.length`
-  // page calls read it from cache instead of each paying full input-token price for it.
-  const shellFiles = await callClaudeForFiles(buildShellPrompt(schema), 'shell', verbose)
-  const pageFiles = (
-    await mapWithConcurrency(schema.pages, PAGE_CONCURRENCY, (page) =>
-      callClaudeForFiles(buildPagePrompt(schema, page), page.title, verbose)
-    )
-  ).flat()
+  // The shell call runs first (not alongside the page calls) for two reasons: it decides the
+  // design system (spacing/card/heading/button conventions — see design-system.ts) that every
+  // page call below needs, and it warms its own cache_control entry before anything else fires.
+  const shellResult = await callClaudeForFiles(buildShellPrompt(schema), 'shell', verbose)
+  const { spec: designSystemSpec, files: shellFiles, validationError } = extractDesignSystemSpec(shellResult)
+
+  if (verbose) {
+    if (designSystemSpec) {
+      process.stdout.write(`  Design system captured (${designSystemSpec.length.toLocaleString()} chars) — threading into all page calls\n`)
+    } else if (validationError) {
+      process.stdout.write(`  Design system spec failed validation (${validationError}) — pages will not share explicit visual conventions\n`)
+    } else {
+      process.stdout.write(`  No design system spec in shell output — pages will not share explicit visual conventions\n`)
+    }
+  }
+
+  // Every page call shares an identical cache_control-marked site-context block that now
+  // includes the design system spec above — a different cached block than the shell used (it
+  // doesn't have the spec yet when it runs), so the first page call here re-establishes the
+  // cache entry and every page call after it reads from that instead of paying full price.
+  const [firstPage, ...restPages] = schema.pages
+  let pageFiles: GeneratedFile[] = []
+  if (firstPage) {
+    const firstPageFiles = await callClaudeForFiles(buildPagePrompt(schema, firstPage, designSystemSpec), firstPage.title, verbose)
+    const restPageFiles = (
+      await mapWithConcurrency(restPages, PAGE_CONCURRENCY, (page) =>
+        callClaudeForFiles(buildPagePrompt(schema, page, designSystemSpec), page.title, verbose)
+      )
+    ).flat()
+    pageFiles = [...firstPageFiles, ...restPageFiles]
+  }
 
   const claudeFiles: GeneratedFile[] = [...shellFiles, ...pageFiles]
 
@@ -51,6 +73,10 @@ export const generateWithClaude = async (siteSchema: SiteSchema, outDir: string,
     { path: 'postcss.config.mjs', content: generatePostcss() },
     { path: 'src/app/globals.css', content: generateGlobalsCss(schema.brandColors) },
     ...deterministicComponents,
+    // docs/ is where every human-facing artifact of the modernization effort lands (design
+    // system today; the modernization report will join it once that exists) — not under src/
+    // since none of it is app code.
+    ...(designSystemSpec ? [{ path: 'docs/design-system.md', content: designSystemSpec }] : []),
   ]
   const deterministicPaths = new Set(deterministicFiles.map((f) => f.path))
   const allFiles = [...deterministicFiles, ...claudeFiles.filter((f) => !deterministicPaths.has(f.path))]
