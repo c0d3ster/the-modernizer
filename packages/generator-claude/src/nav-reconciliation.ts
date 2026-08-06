@@ -1,7 +1,7 @@
 import type { NavItem, PageSchema } from '@modernizer/schema'
 import { urlToRoutePath } from './route-utils.js'
 
-const isLocalRoutePath = (url: string): boolean => url.startsWith('/')
+const isLocalRoutePath = (url: string): boolean => url.startsWith('/') && !url.startsWith('//')
 
 const firstSegment = (routePath: string): string | undefined => routePath.split('/')[1] || undefined
 

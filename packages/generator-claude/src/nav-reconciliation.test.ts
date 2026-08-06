@@ -78,6 +78,15 @@ describe('reconcileNav', () => {
     expect(result).toEqual([{ label: 'Facebook', url: 'https://facebook.com/example' }])
   })
 
+  it('leaves a protocol-relative external link untouched rather than treating it as a dead local route', () => {
+    const nav: NavItem[] = [{ label: 'CDN Asset', url: '//cdn.example.com/asset' }]
+    const pages: PageSchema[] = []
+
+    const result = reconcileNav(nav, pages, ROOT_URL)
+
+    expect(result).toEqual([{ label: 'CDN Asset', url: '//cdn.example.com/asset' }])
+  })
+
   it('merges an orphaned page into an existing top-level nav entry sharing its first segment', () => {
     const nav: NavItem[] = [{ label: 'Services', url: '/services/consulting', children: [{ label: 'Consulting', url: '/services/consulting' }] }]
     const pages = [page('/services/consulting', 'Consulting'), page('/services/support', 'Support')]
