@@ -1,8 +1,9 @@
 import Anthropic from '@anthropic-ai/sdk'
 
-const MODEL = 'claude-sonnet-4-5'
+const MODEL = 'claude-sonnet-5'
 
-// Sonnet pricing (per million tokens, as of 2025)
+// claude-sonnet-5 standard Sonnet-tier rate: $3/$15 per MTok (discounted to $2/$10 through 2026-08-31 —
+// not reflected here since these constants should stay accurate after the intro window closes).
 const COST_PER_M_INPUT = 3.0
 const COST_PER_M_OUTPUT = 15.0
 
@@ -42,7 +43,11 @@ export const callLlmWithTool = async <T>(prompt: string, tool: LlmTool): Promise
   const response = await getClient().messages.create({
     model: MODEL,
     max_tokens: 8192,
-    temperature: 0,
+    // claude-sonnet-5 rejects non-default sampling params (temperature: 0 among them) — the old
+    // determinism intent is approximated instead with low effort + thinking off, which also keeps
+    // this classification call's cost/latency profile close to what it was before the migration.
+    thinking: { type: 'disabled' },
+    output_config: { effort: 'low' },
     tools: [tool],
     tool_choice: { type: 'tool', name: tool.name },
     messages: [{ role: 'user', content: prompt }],
