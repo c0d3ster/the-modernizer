@@ -17,7 +17,10 @@ const OLD_WP_THEME_NAMES = [
   'twentynineteen',
 ]
 
-const OLD_WP_THEME_PATTERN = new RegExp(`/wp-content/themes/(${OLD_WP_THEME_NAMES.join('|')})/`, 'i')
+const OLD_WP_THEME_PATTERN = new RegExp(
+  `/wp-content/themes/(${OLD_WP_THEME_NAMES.join('|')})/`,
+  'i'
+)
 
 export const detectNoViewport = (html: string): boolean => {
   const $ = cheerio.load(html)
@@ -36,7 +39,8 @@ export const extractOldWpTheme = (html: string): string | null => {
   return match?.[1] ?? null
 }
 
-export const detectOldWpTheme = (html: string): boolean => extractOldWpTheme(html) !== null
+export const detectOldWpTheme = (html: string): boolean =>
+  extractOldWpTheme(html) !== null
 
 export const detectNoOgTags = (html: string): boolean => {
   const $ = cheerio.load(html)
@@ -53,7 +57,9 @@ export const detectTableLayout = (html: string): boolean => {
     .some((el) => {
       const $table = $(el)
       const isDataTable =
-        $table.find('th').length > 0 || $table.find('thead').length > 0 || $table.attr('role') === 'table'
+        $table.find('th').length > 0 ||
+        $table.find('thead').length > 0 ||
+        $table.attr('role') === 'table'
       return !isDataTable
     })
 }

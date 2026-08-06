@@ -28,9 +28,14 @@ export interface StaticScoreResult {
   notes: string
 }
 
-const clamp = (value: number, min: number, max: number): number => Math.min(Math.max(value, min), max)
+const clamp = (value: number, min: number, max: number): number =>
+  Math.min(Math.max(value, min), max)
 
-const buildNotes = (result: Omit<StaticScoreResult, 'score' | 'notes'>, wpTheme: string | null, stalenessWeight: number): string => {
+const buildNotes = (
+  result: Omit<StaticScoreResult, 'score' | 'notes'>,
+  wpTheme: string | null,
+  stalenessWeight: number
+): string => {
   const parts: string[] = []
   if (result.noSsl) parts.push('no_ssl')
   if (result.noViewport) parts.push('no_viewport')
@@ -43,7 +48,9 @@ const buildNotes = (result: Omit<StaticScoreResult, 'score' | 'notes'>, wpTheme:
   return parts.join(', ')
 }
 
-export const computeStaticScore = (input: StaticScoreInput): StaticScoreResult => {
+export const computeStaticScore = (
+  input: StaticScoreInput
+): StaticScoreResult => {
   const { html, noSsl, stalenessWeight } = input
 
   const noViewport = detectNoViewport(html)
@@ -54,7 +61,11 @@ export const computeStaticScore = (input: StaticScoreInput): StaticScoreResult =
   const tableLayout = detectTableLayout(html)
   const ieCompatible = detectIeCompatible(html)
 
-  const clampedStalenessWeight = clamp(stalenessWeight, 0, STATIC_SCORE_WEIGHTS.staleness)
+  const clampedStalenessWeight = clamp(
+    stalenessWeight,
+    0,
+    STATIC_SCORE_WEIGHTS.staleness
+  )
 
   const firedWeight =
     (noSsl ? STATIC_SCORE_WEIGHTS.noSsl : 0) +
@@ -68,7 +79,15 @@ export const computeStaticScore = (input: StaticScoreInput): StaticScoreResult =
 
   const score = 100 * (1 - firedWeight / STATIC_SCORE_TOTAL_WEIGHT)
 
-  const signals = { noSsl, noViewport, oldJquery, oldWpTheme, noOgTags, tableLayout, ieCompatible }
+  const signals = {
+    noSsl,
+    noViewport,
+    oldJquery,
+    oldWpTheme,
+    noOgTags,
+    tableLayout,
+    ieCompatible,
+  }
 
   return {
     score,

@@ -7,14 +7,22 @@ import { describe, expect, it } from 'vitest'
 import { computeStaticScore } from './score.js'
 import { STATIC_SCORE_TOTAL_WEIGHT, STATIC_SCORE_WEIGHTS } from './weights.js'
 
-const FIXTURES_DIR = join(dirname(fileURLToPath(import.meta.url)), '../../fixtures')
+const FIXTURES_DIR = join(
+  dirname(fileURLToPath(import.meta.url)),
+  '../../fixtures'
+)
 
-const readFixture = (name: string): string => readFileSync(join(FIXTURES_DIR, name), 'utf-8')
+const readFixture = (name: string): string =>
+  readFileSync(join(FIXTURES_DIR, name), 'utf-8')
 
 describe('computeStaticScore', () => {
   it('scores a fully modern site at 100 with no signals fired', () => {
     const html = readFixture('fully-modern.html')
-    const result = computeStaticScore({ html, noSsl: false, stalenessWeight: 0 })
+    const result = computeStaticScore({
+      html,
+      noSsl: false,
+      stalenessWeight: 0,
+    })
 
     expect(result.score).toBe(100)
     expect(result).toMatchObject({
@@ -31,7 +39,11 @@ describe('computeStaticScore', () => {
 
   it('scores a site with every signal firing at 0', () => {
     const html = readFixture('all-signals.html')
-    const result = computeStaticScore({ html, noSsl: true, stalenessWeight: STATIC_SCORE_WEIGHTS.staleness })
+    const result = computeStaticScore({
+      html,
+      noSsl: true,
+      stalenessWeight: STATIC_SCORE_WEIGHTS.staleness,
+    })
 
     expect(result.score).toBe(0)
     expect(result).toMatchObject({
@@ -60,8 +72,14 @@ describe('computeStaticScore', () => {
 
   it('clamps an out-of-range staleness weight to the signal maximum', () => {
     const html = readFixture('fully-modern.html')
-    const result = computeStaticScore({ html, noSsl: false, stalenessWeight: 999 })
+    const result = computeStaticScore({
+      html,
+      noSsl: false,
+      stalenessWeight: 999,
+    })
 
-    expect(result.score).toBe(100 * (1 - STATIC_SCORE_WEIGHTS.staleness / STATIC_SCORE_TOTAL_WEIGHT))
+    expect(result.score).toBe(
+      100 * (1 - STATIC_SCORE_WEIGHTS.staleness / STATIC_SCORE_TOTAL_WEIGHT)
+    )
   })
 })

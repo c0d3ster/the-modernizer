@@ -12,26 +12,35 @@ import {
 
 describe('detectNoViewport', () => {
   it('fires when no viewport meta tag is present', () => {
-    expect(detectNoViewport('<html><head></head><body></body></html>')).toBe(true)
+    expect(detectNoViewport('<html><head></head><body></body></html>')).toBe(
+      true
+    )
   })
 
   it('does not fire when a viewport meta tag is present', () => {
-    const html = '<html><head><meta name="viewport" content="width=device-width"></head></html>'
+    const html =
+      '<html><head><meta name="viewport" content="width=device-width"></head></html>'
     expect(detectNoViewport(html)).toBe(false)
   })
 })
 
 describe('detectOldJquery', () => {
   it('fires for jquery 1.x', () => {
-    expect(detectOldJquery('<script src="/js/jquery-1.12.4.min.js"></script>')).toBe(true)
+    expect(
+      detectOldJquery('<script src="/js/jquery-1.12.4.min.js"></script>')
+    ).toBe(true)
   })
 
   it('fires for jquery 2.x', () => {
-    expect(detectOldJquery('<script src="/js/jquery-2.2.4.min.js"></script>')).toBe(true)
+    expect(
+      detectOldJquery('<script src="/js/jquery-2.2.4.min.js"></script>')
+    ).toBe(true)
   })
 
   it('does not fire for jquery 3.x', () => {
-    expect(detectOldJquery('<script src="/js/jquery-3.7.1.min.js"></script>')).toBe(false)
+    expect(
+      detectOldJquery('<script src="/js/jquery-3.7.1.min.js"></script>')
+    ).toBe(false)
   })
 
   it('does not fire when no jquery script is present', () => {
@@ -41,13 +50,15 @@ describe('detectOldJquery', () => {
 
 describe('detectOldWpTheme / extractOldWpTheme', () => {
   it('fires and extracts the theme name for an old default WP theme', () => {
-    const html = '<link rel="stylesheet" href="/wp-content/themes/twentyfifteen/style.css">'
+    const html =
+      '<link rel="stylesheet" href="/wp-content/themes/twentyfifteen/style.css">'
     expect(detectOldWpTheme(html)).toBe(true)
     expect(extractOldWpTheme(html)).toBe('twentyfifteen')
   })
 
   it('does not fire for a custom theme', () => {
-    const html = '<link rel="stylesheet" href="/wp-content/themes/my-custom-theme/style.css">'
+    const html =
+      '<link rel="stylesheet" href="/wp-content/themes/my-custom-theme/style.css">'
     expect(detectOldWpTheme(html)).toBe(false)
     expect(extractOldWpTheme(html)).toBeNull()
   })
@@ -63,7 +74,9 @@ describe('detectNoOgTags', () => {
   })
 
   it('does not fire when at least one Open Graph tag is present', () => {
-    expect(detectNoOgTags('<meta property="og:title" content="Test">')).toBe(false)
+    expect(detectNoOgTags('<meta property="og:title" content="Test">')).toBe(
+      false
+    )
   })
 })
 
