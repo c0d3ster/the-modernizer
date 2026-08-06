@@ -1,5 +1,6 @@
 import type { BrandColors, NavItem, SiteSchema } from '@modernizer/schema'
 import { relativizeNavItems } from '../route-utils.js'
+import { reconcileNav } from '../nav-reconciliation.js'
 
 export const formatColorInfo = (brandColors: BrandColors): string =>
   [
@@ -36,8 +37,12 @@ export const LINK_GUARDRAIL =
  * input-token price for it, every call after reads it from cache at ~10% of the cost.
  */
 export const buildSiteContextBlock = (schema: SiteSchema): string => {
-  const { siteName, rootUrl, brandColors, nav, tagline, footer } = schema
-  const localNav = relativizeNavItems(nav, rootUrl)
+  const { siteName, rootUrl, brandColors, nav, pages, tagline, footer } = schema
+  // Nav is extracted from the site's own <nav> menu HTML; pages come from crawling
+  // independently, and the two can drift out of sync (a nav entry with no crawled page 404s;
+  // a crawled page with no nav entry is unreachable). Reconcile before handing nav to Claude
+  // so the generated Navbar never links to a route that doesn't exist.
+  const localNav = reconcileNav(relativizeNavItems(nav, rootUrl), pages, rootUrl)
 
   return `## Site
 - Name: ${siteName}
