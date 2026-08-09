@@ -61,6 +61,7 @@ Spec reference: docs/market-discovery.md defines the discovery pipeline, scoring
 - [ ] #10 [stack: solo] Compare/contrast generation results: local generation vs Lovable vs Claude API. Document quality, cost, and speed tradeoffs in docs/research/generation-comparison.md. Do not switch the default pipeline.
   - Existing tooling already covers most of the mechanical work: `pnpm generate-compare` (`scripts/compare-generators.sh`) runs all three modes against the saved Edgehill fixture; `--claude` already prints elapsed time/token counts/dollar cost; `--local` is $0 (no LLM calls, confirmed). Lovable requires manual browser interaction — no programmatic timing/cost readback exists, so wall-clock time and credit cost must be recorded by hand.
   - No `docs/research/` folder exists yet — this task creates it.
+- [ ] #11 [stack: solo] Research the shadcn skill for `@modernizer/generator-local` output quality. Evaluate whether it improves component composition, Tailwind idiom quality, or reduces hand-rolled primitives versus the current copy-from-`packages/ui` approach. Document findings (fit, integration effort, tradeoffs vs. the current deterministic template approach) in docs/research/shadcn-skill.md. Do not switch the default generator.
 
 ## Decisions (human only, do not attempt)
 
