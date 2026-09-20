@@ -22,6 +22,12 @@ describe('detectNoViewport', () => {
       '<html><head><meta name="viewport" content="width=device-width"></head></html>'
     expect(detectNoViewport(html)).toBe(false)
   })
+
+  it('does not fire for a mixed-case viewport meta name', () => {
+    const html =
+      '<html><head><meta name="Viewport" content="width=device-width"></head></html>'
+    expect(detectNoViewport(html)).toBe(false)
+  })
 })
 
 describe('detectOldJquery', () => {
@@ -46,6 +52,14 @@ describe('detectOldJquery', () => {
   it('does not fire when no jquery script is present', () => {
     expect(detectOldJquery('<script src="/js/app.js"></script>')).toBe(false)
   })
+
+  it('fires for a CDN path with no hyphenated version filename', () => {
+    expect(
+      detectOldJquery(
+        '<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/2.2.4/jquery.min.js"></script>'
+      )
+    ).toBe(true)
+  })
 })
 
 describe('detectOldWpTheme / extractOldWpTheme', () => {
@@ -65,6 +79,19 @@ describe('detectOldWpTheme / extractOldWpTheme', () => {
 
   it('does not fire when there is no WordPress theme reference at all', () => {
     expect(detectOldWpTheme('<html><body>No WP here</body></html>')).toBe(false)
+  })
+
+  it('does not fire when the theme path only appears in body text', () => {
+    const html =
+      '<body><p>Read about /wp-content/themes/twentyfifteen/ in our blog post</p></body>'
+    expect(detectOldWpTheme(html)).toBe(false)
+    expect(extractOldWpTheme(html)).toBeNull()
+  })
+
+  it('does not fire when the theme path only appears in an HTML comment', () => {
+    const html = '<!-- /wp-content/themes/twentyfifteen/ --><body></body>'
+    expect(detectOldWpTheme(html)).toBe(false)
+    expect(extractOldWpTheme(html)).toBeNull()
   })
 })
 

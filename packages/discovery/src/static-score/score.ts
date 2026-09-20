@@ -28,8 +28,11 @@ export interface StaticScoreResult {
   notes: string
 }
 
+// Math.min/Math.max already clamp +/-Infinity correctly; NaN is the one input that
+// would otherwise propagate through untouched, so it falls back to the minimum
+// (no penalty) rather than producing a NaN score.
 const clamp = (value: number, min: number, max: number): number =>
-  Math.min(Math.max(value, min), max)
+  Number.isNaN(value) ? min : Math.min(Math.max(value, min), max)
 
 const buildNotes = (
   result: Omit<StaticScoreResult, 'score' | 'notes'>,

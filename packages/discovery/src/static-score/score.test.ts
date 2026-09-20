@@ -82,4 +82,16 @@ describe('computeStaticScore', () => {
       100 * (1 - STATIC_SCORE_WEIGHTS.staleness / STATIC_SCORE_TOTAL_WEIGHT)
     )
   })
+
+  it('treats a NaN staleness weight as no penalty instead of propagating NaN', () => {
+    const html = readFixture('fully-modern.html')
+    const result = computeStaticScore({
+      html,
+      noSsl: false,
+      stalenessWeight: NaN,
+    })
+
+    expect(result.score).toBe(100)
+    expect(Number.isNaN(result.score)).toBe(false)
+  })
 })

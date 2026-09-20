@@ -1,6 +1,8 @@
 import * as cheerio from 'cheerio'
 
-const OLD_JQUERY_PATTERN = /jquery-1\.|jquery-2\./i
+// Matches both hyphenated filenames (jquery-2.2.4.min.js) and CDN path segments
+// (/ajax/libs/jquery/2.2.4/jquery.min.js).
+const OLD_JQUERY_PATTERN = /jquery(?:-|\/)[12]\./i
 
 // WordPress default themes named after their release year, Twenty Ten (2010) through
 // Twenty Nineteen (2019) — five years old is treated as "not updated in a while".
@@ -24,7 +26,7 @@ const OLD_WP_THEME_PATTERN = new RegExp(
 
 export const detectNoViewport = (html: string): boolean => {
   const $ = cheerio.load(html)
-  return $('head meta[name="viewport"]').length === 0
+  return $('head meta[name="viewport" i]').length === 0
 }
 
 export const detectOldJquery = (html: string): boolean => {
@@ -34,9 +36,16 @@ export const detectOldJquery = (html: string): boolean => {
     .some((el) => OLD_JQUERY_PATTERN.test($(el).attr('src') ?? ''))
 }
 
+// Scoped to href/src attributes (not raw HTML text) so a theme path mentioned in
+// body copy or an HTML comment can't trigger a false positive.
 export const extractOldWpTheme = (html: string): string | null => {
-  const match = OLD_WP_THEME_PATTERN.exec(html)
-  return match?.[1] ?? null
+  const $ = cheerio.load(html)
+  for (const el of $('[href], [src]').toArray()) {
+    const url = $(el).attr('href') ?? $(el).attr('src') ?? ''
+    const match = OLD_WP_THEME_PATTERN.exec(url)
+    if (match) return match[1] ?? null
+  }
+  return null
 }
 
 export const detectOldWpTheme = (html: string): boolean =>
