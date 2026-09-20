@@ -1,0 +1,28 @@
+{
+  "name": "@modernizer/discovery-cli",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "the-modernizer-score": "./dist/index.js"
+  },
+  "scripts": {
+    "dev": "node --watch dist/index.js",
+    "start": "tsx src/index.ts",
+    "build": "tsc",
+    "lint": "eslint . --max-warnings 0",
+    "check-types": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@modernizer/eslint-config": "workspace:*",
+    "@modernizer/typescript-config": "workspace:*",
+    "@types/node": "^22.15.3",
+    "eslint": "^9.39.1",
+    "tsx": "^4.19.2",
+    "typescript": "5.9.2"
+  },
+  "dependencies": {
+    "@modernizer/discovery": "workspace:*",
+    "commander": "^14.0.3"
+  }
+}

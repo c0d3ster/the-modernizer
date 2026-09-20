@@ -18,6 +18,11 @@ coverage
 # Local test fixtures (crawled HTML + extracted schemas)
 **/fixtures/
 
+# Exception: packages/discovery/fixtures are hand-authored, deterministic HTML used for
+# golden-formula scoring tests, not live-crawl output — these are meant to be committed.
+!packages/discovery/fixtures/
+!packages/discovery/fixtures/**
+
 # Generator output (dev script default output dir)
 .generated/
 
