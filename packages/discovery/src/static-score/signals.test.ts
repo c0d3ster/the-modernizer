@@ -131,6 +131,23 @@ describe('detectTableLayout', () => {
   it('does not fire when there are no tables at all', () => {
     expect(detectTableLayout('<div>No tables</div>')).toBe(false)
   })
+
+  it('fires for a layout table that wraps a nested data table', () => {
+    const html = `
+      <table>
+        <tr>
+          <td>Home</td>
+          <td>
+            <table>
+              <thead><tr><th>Item</th><th>Price</th></tr></thead>
+              <tr><td>Soup</td><td>$5</td></tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+    `
+    expect(detectTableLayout(html)).toBe(true)
+  })
 })
 
 describe('detectIeCompatible', () => {

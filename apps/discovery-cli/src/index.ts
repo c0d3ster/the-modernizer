@@ -23,7 +23,11 @@ const fetchWithSslCheck = async (
   const httpsUrl = toHttps(withScheme(inputUrl))
   try {
     return { html: await fetchHtml(httpsUrl), noSsl: false }
-  } catch {
+  } catch (err) {
+    // fetchHtml throws `HTTP ${status}` after a completed TLS handshake that
+    // returned a non-2xx. That's not a missing/invalid cert — don't mark no_ssl
+    // or silently score whatever the HTTP fallback happens to return.
+    if (err instanceof Error && err.message.startsWith('HTTP ')) throw err
     return { html: await fetchHtml(toHttp(httpsUrl)), noSsl: true }
   }
 }

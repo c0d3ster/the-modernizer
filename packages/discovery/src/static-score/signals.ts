@@ -58,16 +58,20 @@ export const detectNoOgTags = (html: string): boolean => {
 
 // A <table> is treated as layout (not data) when it has no header cells, no <thead>,
 // and no explicit ARIA table role — the absence of any of the usual "this is tabular
-// data" markers is what layout-era tables look like.
+// data" markers is what layout-era tables look like. Markers are checked on each
+// table independently: nested data tables (pricing, hours, menus) must not hide an
+// outer layout table, which is the usual pre-CSS page structure.
 export const detectTableLayout = (html: string): boolean => {
   const $ = cheerio.load(html)
   return $('table')
     .toArray()
     .some((el) => {
       const $table = $(el)
+      const $own = $table.clone()
+      $own.find('table').remove()
       const isDataTable =
-        $table.find('th').length > 0 ||
-        $table.find('thead').length > 0 ||
+        $own.find('th').length > 0 ||
+        $own.find('thead').length > 0 ||
         $table.attr('role') === 'table'
       return !isDataTable
     })
