@@ -22,7 +22,12 @@ export const fetchCdxSnapshots = async (
     url,
     output: 'json',
     fl: 'timestamp,digest',
-    limit: '50',
+    // Negative limit returns the most recent N rows of the (still ascending-order)
+    // result set. A positive limit truncates from the oldest end instead, which
+    // silently drops the most recent snapshots on any site with >50 content changes
+    // since 2015 — computeStaleness only needs the last one, so this must anchor to
+    // "most recent," not "earliest."
+    limit: '-50',
     from: '20150101',
     collapse: 'digest',
   })
