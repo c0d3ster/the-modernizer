@@ -67,6 +67,34 @@ importers:
         specifier: 5.9.2
         version: 5.9.2
 
+  apps/discovery-cli:
+    dependencies:
+      '@modernizer/discovery':
+        specifier: workspace:*
+        version: link:../../packages/discovery
+      commander:
+        specifier: ^14.0.3
+        version: 14.0.3
+    devDependencies:
+      '@modernizer/eslint-config':
+        specifier: workspace:*
+        version: link:../../packages/eslint-config
+      '@modernizer/typescript-config':
+        specifier: workspace:*
+        version: link:../../packages/typescript-config
+      '@types/node':
+        specifier: ^22.15.3
+        version: 22.15.3
+      eslint:
+        specifier: ^9.39.1
+        version: 9.39.1(jiti@2.6.1)
+      tsx:
+        specifier: ^4.19.2
+        version: 4.21.0
+      typescript:
+        specifier: 5.9.2
+        version: 5.9.2
+
   apps/preview:
     dependencies:
       next:
@@ -1892,6 +1920,7 @@ packages:
   eslint@9.39.1:
     resolution: {integrity: sha512-BhHmn2yNOFA9H9JmmIVKJmd288g9hrVRDkdoIgRCRuSySRUHH7r/DI6aAXW9T1WwUuY3DFgrcaqB+deURBLR5g==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
+    deprecated: This version is no longer supported. Please see https://eslint.org/version-support for other options.
     hasBin: true
     peerDependencies:
       jiti: '*'
