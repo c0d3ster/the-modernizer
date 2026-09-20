@@ -8,16 +8,6 @@ Spec reference: docs/market-discovery.md defines the discovery pipeline, scoring
 
 ## Agent-Ready
 
-- [ ] #1 [stack: discovery] Implement static HTML scoring per docs/market-discovery.md "Sub-score 1: Static HTML". All signals from the weights table (SSL, viewport, old jQuery, old WP theme, table layout, OG tags, IE compat), normalized via the documented formula.
-  - New package `packages/discovery` (mirror `packages/crawler`'s scaffold: package.json, tsconfig, eslint, vitest.config, `src/index.ts` barrel). Houses this task plus staleness (#2) and PSI (#3).
-  - Files: `src/static-score/signals.ts` (one pure detector per signal), `src/static-score/weights.ts` (shared constants: SSL 20, viewport 20, staleness 20, old jQuery 12, old WP theme 10, table layout 10, no OG 5, IE compat 3), `src/static-score/score.ts` (`computeStaticScore`). No raw-HTML fixtures exist anywhere in the repo yet — hand-author `fixtures/*.html` (an all-signals-firing site and a fully-modern site) for the golden-formula test.
-  - SSL detection needs a live fetch, not pure HTML parsing — take it as an injected boolean input rather than computing it from the HTML string.
-  - No documented algorithm for "table-based layout" — pick a heuristic (e.g. `<table>` present without `<th>`/`<thead>`/`role="table"`) and document the choice in the PR.
-  - Acceptance: unit tests cover each signal firing and not firing; sub-score matches the formula for known fixture HTML; return shape exposes per-signal booleans + a notes string (not just the numeric score), field-named to match the Output Format columns, so #5/#6 can consume it directly.
-- [ ] #2 [stack: discovery] Implement staleness detection via Wayback CDX per docs/market-discovery.md "Determining True Last-Updated Date". Use collapse=digest, sliding scale weight min(years × 4, 20), copyright-regex fallback worth 10 when Wayback has no data, 1 req/sec rate limit.
-  - Files (in `packages/discovery` from #1): `src/wayback-cdx.ts` (CDX fetch/parse), `src/staleness.ts` (weight calc + copyright fallback), `src/rate-limiter.ts` (1 req/sec gate — no shared rate-limiter exists in the repo yet).
-  - Resolve and document: fractional-year rounding for `min(years × 4, 20)`; behavior when only one CDX snapshot exists (no digest change to compare against, so "years since last change" is ambiguous).
-  - Acceptance: returns last_changed date and staleness weight for a URL with CDX data; falls back gracefully with none; a test asserts sequential calls are spaced ≥1000ms apart (via a test double/timestamps, not live network calls).
 - [ ] #3 [stack: discovery] Implement PSI sub-score per docs/market-discovery.md "Sub-score 2: Lighthouse / PSI". Weighted average: performance 0.30, SEO 0.40, accessibility 0.30. Combine into final score: static × 0.50 + psi × 0.50.
   - Files (in `packages/discovery`): `src/psi-score.ts`, `src/final-score.ts`.
   - Requires PSI API key. If absent, annotate NEEDS HUMAN with the exact env var name (proposed: `PSI_API_KEY`) — resolve consistently with #4's Places key (separate keys vs. one shared `GOOGLE_API_KEY` covering both APIs) rather than deciding independently.
