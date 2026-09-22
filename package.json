@@ -10,6 +10,7 @@
     "test": "turbo run test",
     "modernize": "tsx apps/cli/src/index.ts",
     "score": "tsx apps/discovery-cli/src/index.ts",
+    "discover-candidates": "tsx scripts/discover-candidates.ts",
     "generate-compare": "bash scripts/compare-generators.sh"
   },
   "devDependencies": {
