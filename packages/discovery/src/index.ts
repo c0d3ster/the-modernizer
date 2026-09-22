@@ -33,3 +33,7 @@ export type {
 } from './staleness.js'
 export { fetchCdxSnapshots } from './wayback-cdx.js'
 export type { CdxSnapshot } from './wayback-cdx.js'
+export { computePsiScore, fetchPsiScore, PSI_SCORE_WEIGHTS } from './psi-score.js'
+export type { PsiCategoryScores, PsiScoreOptions, PsiScoreResult } from './psi-score.js'
+export { computeFinalScore, FINAL_SCORE_WEIGHTS } from './final-score.js'
+export type { FinalScoreInput, FinalScoreResult } from './final-score.js'
