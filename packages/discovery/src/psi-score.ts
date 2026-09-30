@@ -60,6 +60,11 @@ export const fetchPsiScore = async (
   if (!apiKey) return null
 
   const params = new URLSearchParams({ url, strategy: 'mobile', key: apiKey })
+  // PSI defaults to performance-only if no `category` param is sent, which would
+  // otherwise fail PsiResponseSchema validation (all three categories are required).
+  params.append('category', 'performance')
+  params.append('category', 'seo')
+  params.append('category', 'accessibility')
 
   try {
     const response = await fetchImpl(`${PSI_ENDPOINT}?${params.toString()}`, {
