@@ -232,13 +232,15 @@ Stage 5 — Output ranked CSV
 
 Scores work like Lighthouse: **100 = perfectly modern site**, **0 = completely outdated**. Lower scores are better prospects.
 
-Scoring uses **two independent automated sub-scores** combined into a weighted final score. Each sub-score is normalized to 0-100 within its own category, so the total can never go out of range. All signals are fully automated — no human review step, making results consistent across runs.
+Scoring uses **four independent automated signals**, each weighted equally, combined into a final score. Each signal is normalized to 0-100, so the total can never go out of range. All signals are fully automated — no human review step, making results consistent across runs.
 
 ### Final score formula
 
 ```
-final = (static_score × 0.50) + (psi_score × 0.50)
+final = (static_score × 0.25) + (performance × 0.25) + (seo × 0.25) + (accessibility × 0.25)
 ```
+
+Performance carries full weight alongside SEO and accessibility — outdated hosting/deployment is itself a fixable modernization pitch (e.g. migrating to Vercel, moving off a legacy stack), not just a neutral signal to discount.
 
 **Thresholds:**
 - **≤ 40** — strong candidate, clear visual case for modernization
@@ -247,7 +249,7 @@ final = (static_score × 0.50) + (psi_score × 0.50)
 
 ---
 
-### Sub-score 1: Static HTML (50% weight)
+### Sub-score 1: Static HTML (25% weight)
 
 Fast checks against raw HTML — no browser, no API key. Each signal has a weight. The sub-score is calculated as:
 
@@ -300,7 +302,7 @@ If Wayback has **no data** for the URL, fall back to the copyright year regex (`
 
 ---
 
-### Sub-score 2: Lighthouse / PSI (50% weight)
+### Sub-scores 2-4: Lighthouse / PSI (25% weight each)
 
 Lighthouse is the open-source audit engine built into Chrome DevTools (Lighthouse tab). The PageSpeed Insights API runs the same engine server-side — no browser required, just an HTTP call.
 
@@ -311,20 +313,23 @@ GET https://www.googleapis.com/pagespeedonline/v5/runPagespeed
   ?url=https://example.com
   &strategy=mobile
   &key=YOUR_KEY
+  &category=performance
+  &category=seo
+  &category=accessibility
 ```
 
-**Key response fields:**
+**Key response fields** (each feeds directly into the final score at 25% weight, after multiplying by 100 to bring it into the 0-100 range):
 - `lighthouseResult.categories.performance.score` — multiply by 100
 - `lighthouseResult.categories.seo.score` — multiply by 100
 - `lighthouseResult.categories.accessibility.score` — multiply by 100
 
-**PSI sub-score formula** — weighted average of three Lighthouse categories, with SEO and accessibility weighted higher than raw performance since server speed is not a signal of design neglect:
+**Reported `psi_score` column:** the CSV still reports a weighted composite of the three categories for convenience, with SEO and accessibility weighted higher than raw performance within that composite:
 
 ```
 psi_score = (performance × 0.30) + (seo × 0.40) + (accessibility × 0.30)
 ```
 
-After multiplying the raw API scores by 100, all three inputs are 0-100, so `psi_score` is always in range.
+This composite is informational only — it is not part of the final score formula above, which weights performance, SEO, and accessibility independently at 25% each.
 
 **Cost:** Free with a Google Cloud API key. Rate limit: 25,000 queries/day.
 
