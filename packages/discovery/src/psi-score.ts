@@ -67,8 +67,11 @@ export const fetchPsiScore = async (
   params.append('category', 'accessibility')
 
   try {
+    // Complex/large pages (verified live against amazon.com) can take 45-55s for PSI to
+    // run a full Lighthouse audit, well past 30s — our actual target sites (small, static
+    // brochure sites) finish much faster, so 60s costs nothing on the common path.
     const response = await fetchImpl(`${PSI_ENDPOINT}?${params.toString()}`, {
-      signal: AbortSignal.timeout(30000),
+      signal: AbortSignal.timeout(60000),
     })
     if (!response.ok) return null
 
