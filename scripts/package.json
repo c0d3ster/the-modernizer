@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "discover": "tsx discover-candidates.ts",
+    "discover": "node --env-file-if-exists=../.env --import tsx discover-candidates.ts",
     "lint": "eslint . --max-warnings 0",
     "check-types": "tsc --noEmit",
     "test": "vitest run"
