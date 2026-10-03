@@ -89,10 +89,11 @@ Branch: overnight/2026-09-22/02-discover-candidates
   only apply on the has-website branch. The doc's flowchart never applies those filters to
   the no-website branch, so a review-heavy or chain-named business with no website still
   becomes a greenfield lead.
-- **Place Details deferred until after Stage 2 filtering, for both output branches:** per
-  the doc's optimization note, `formatted_phone_number`/`formatted_address` (Details-only
-  fields per this doc) are fetched only for records that survive routing — both
-  greenfield and continuing — never for dropped (chain/review-count) records.
+- **Places API (New), no Place Details step:** migrated from the legacy Places API (not
+  available to new Google Cloud projects) to `places:searchText`. Phone and address are
+  requested in the same call via `X-Goog-FieldMask`, so the earlier "Details only after
+  Stage 2 filtering" step and its rate limiter were removed. Website/rating/review count
+  already force the Enterprise tier, so phone/address add no extra tier cost.
 - **`city`/`state` on output records come from the input config, not parsed from
   `formatted_address`:** matches what "given config (city, state, business types)"
   implies the acceptance criteria wants, and avoids fragile address-string parsing.
@@ -103,8 +104,8 @@ Branch: overnight/2026-09-22/02-discover-candidates
 - **CSV writing is hand-rolled**, not a new dependency: only two flat, doc-specified
   schemas, so a ~10-line escape/join helper was simpler than pulling in a CSV library.
 - **Pagination rate limiting reuses `@modernizer/discovery`'s `createRateLimiter`**
-  (2000ms, matching Google's documented `next_page_token` activation delay) rather than
-  duplicating that logic — added `@modernizer/discovery` as a dependency of `scripts`.
+  (250ms courtesy delay between pages; the New API has no documented token activation
+  delay) rather than duplicating that logic — added `@modernizer/discovery` as a dependency of `scripts`.
 - **Cross-platform CLI entrypoint guard:** the usual `import.meta.url ===
   file://${process.argv[1]}` check silently fails on Windows (backslash-separated
   `argv[1]` vs. forward-slash `file:///` URL), so `discover-candidates.ts` never ran when
@@ -140,13 +141,12 @@ single-file package)
 - **No live Places API run:** `GOOGLE_PLACES_API_KEY` is not set in this environment
   (confirmed absent). Built and tested entirely against fabricated fixture response
   shapes (documented as fabricated, not recorded, in
-  `scripts/discover-candidates.test.ts` — matching the fields the doc specifies Text
-  Search / Place Details return) via the injectable `fetchImpl` option. Flagged as `NEEDS
+  `scripts/discover-candidates.test.ts` — matching the fields requested in the Places
+  API (New) field mask) via the injectable `fetchImpl` option. Flagged as `NEEDS
   HUMAN` in TASKS.md/PR: set `GOOGLE_PLACES_API_KEY` (a Google Cloud API key with the
-  Places API enabled) and run `pnpm discover-candidates --city <city> --state <state>`
-  against real data to confirm the response shapes this task assumed (e.g., whether Text
-  Search actually returns `website` directly, per the doc, vs. requiring a Details call
-  like `formatted_phone_number`/`formatted_address` do) hold against the live API.
+  Places API (New) enabled) and run `pnpm discover-candidates --city <city> --state <state>`
+  against real data to confirm the response shapes this task assumed (field names,
+  `places` omitted on empty results, `nextPageToken` pagination) hold against the live API.
 - All other acceptance criteria — filtered continuing-candidate list preserving the full
   Stage 1 record, separate `greenfield-leads.csv` with the doc's exact schema, pagination
   capped at 3 pages, dedup, known-chain starter list — are implemented and covered by
