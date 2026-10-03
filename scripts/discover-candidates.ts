@@ -8,7 +8,7 @@
 // Continued by `#5`, which adds Stages 3-5 (static + PSI scoring, ranked candidates.csv
 // output) to this same file. `#5` imports `runDiscovery` (and the types below) directly
 // rather than round-tripping through a file, since it runs in the same process.
-import { writeFile } from 'node:fs/promises'
+import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 
@@ -404,6 +404,8 @@ program.action(async (opts: CliOptions) => {
 
   try {
     const { continuing, greenfield } = await runDiscovery(config)
+
+    await mkdir(opts.outDir, { recursive: true })
 
     const greenfieldPath = path.join(opts.outDir, 'greenfield-leads.csv')
     await writeGreenfieldCsv(greenfield, greenfieldPath)
