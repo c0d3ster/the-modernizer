@@ -211,7 +211,9 @@ Stage 3 — HTML fetch + static scoring
   ↓
 Stage 4 — Lighthouse / PSI scoring
   → call PSI API for mobile performance, SEO, and accessibility scores
-  → adds ~2s per URL
+  → adds several seconds up to ~60s per URL (a full Lighthouse run, not a
+    lightweight call — verified live against amazon.com at ~52s, which is why
+    fetchPsiScore's timeout is 60s; small brochure sites finish well under that)
   ↓
 Stage 5 — Output ranked CSV
   → sort by score ascending (lowest = best prospect)
@@ -224,7 +226,7 @@ Stage 5 — Output ranked CSV
 - `candidates.csv` — businesses with a website, sorted by modernity score (low = best prospect). Top candidates feed into `pnpm modernize`.
 - `greenfield-leads.csv` — businesses with no website at all. Direct outreach for a new build; route to c0d3ster for project provisioning.
 
-**Estimated run time:** ~5 min for 200 URLs, mostly PSI API latency (~2s per URL).
+**Estimated run time:** dominated by PSI API latency, not the ~2s originally assumed — a sequential run of 200 URLs at several seconds to ~60s each could take well over an hour. The batch pipeline (#5 in TASKS.md, not yet built) will need concurrency/rate-limiting design to stay practical at this scale; PSI's own limit is 25,000 queries/day (plenty of headroom), so the bottleneck is wall-clock time per call, not quota.
 
 ---
 
