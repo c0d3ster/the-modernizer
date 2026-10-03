@@ -99,6 +99,7 @@ Outputs:
 | `@modernizer/generator-lovable` | Lovable Build-with-URL generator |
 | `@modernizer/generator-local` | Deterministic template generator |
 | `@modernizer/ui` | Block component library (shadcn/ui primitives + layout components) |
+| `@modernizer/discovery` | Candidate site scoring for the market-discovery pipeline — see below |
 
 ## Apps
 
@@ -106,6 +107,22 @@ Outputs:
 |---|---|
 | `apps/cli` | Command-line entry point |
 | `apps/preview` | Visual test harness for block components |
+| `apps/discovery-cli` | Scores a single candidate URL (`pnpm score <url>`) |
+
+## Candidate Scoring
+
+`pnpm score <url>` scores how good a modernization prospect a site is — 100 = perfectly modern, 0 = completely outdated, lower is a better prospect. The final score is four independent signals weighted equally at 25% each:
+
+```
+final = (static_score × 0.25) + (performance × 0.25) + (seo × 0.25) + (accessibility × 0.25)
+```
+
+- `static_score` — fast HTML checks (viewport, SSL, old jQuery, WP theme age, table layouts, staleness via the Wayback Machine, etc.), no API key needed.
+- `performance`, `seo`, `accessibility` — Google PageSpeed Insights (Lighthouse) categories. Requires a `PSI_API_KEY` env var (a Google Cloud API key with the PageSpeed Insights API enabled, free up to 25,000 queries/day). Without it, the score degrades to `static_score` alone rather than failing.
+
+PSI runs a full Lighthouse audit per URL, which can take several seconds up to ~60s for a complex page — budget for that when scoring a batch of candidates.
+
+Full scoring rubric, signal weights, and rationale: `docs/market-discovery.md`.
 
 ## Development
 
