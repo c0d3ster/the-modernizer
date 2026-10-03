@@ -52,3 +52,6 @@ yarn-error.log*
 
 # Claude Code
 .claude
+
+# Discovery output (contains business contact info)
+/leads/
