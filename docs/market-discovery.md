@@ -120,28 +120,31 @@ These replace the manual Google Maps browsing with API calls. They require API k
 
 The most direct path: search by business type and location, get a list of businesses with their website URLs.
 
-**API used:** Google Places Text Search or Nearby Search
+**API used:** Google Places API (New) Text Search (`places:searchText`). The legacy Places API (`/maps/api/place/...`) is not available to newly created Google Cloud projects.
 **Cost:** ~$0.017 per request, $200/month free credit (enough for thousands of queries)
-**Requires:** Google Cloud project with Places API enabled
+**Requires:** Google Cloud project with Places API (New) enabled
 
 **Endpoint:**
 ```
-GET https://maps.googleapis.com/maps/api/place/textsearch/json
-  ?query=plumber+austin+tx
-  &key=YOUR_KEY
+POST https://places.googleapis.com/v1/places:searchText
+Headers:
+  X-Goog-Api-Key: YOUR_KEY
+  X-Goog-FieldMask: places.id,places.displayName,places.websiteUri,places.userRatingCount,places.rating,places.nationalPhoneNumber,places.formattedAddress,nextPageToken
+Body:
+  { "textQuery": "plumber austin tx", "pageSize": 20 }
 ```
 
 **Response fields to extract:**
-- `results[].website` — the business URL to score (absent = greenfield lead)
-- `results[].name` — business name for output
-- `results[].formatted_phone_number` — for outreach CSV (requires Place Details call)
-- `results[].vicinity` / `results[].formatted_address` — location for output
-- `results[].user_ratings_total` — filter to 10-200 reviews (active but small)
-- `results[].rating` — optional, not strongly correlated with site quality
+- `places[].websiteUri` — the business URL to score (absent = greenfield lead)
+- `places[].displayName.text` — business name for output
+- `places[].nationalPhoneNumber` — for outreach CSV
+- `places[].formattedAddress` — location for output
+- `places[].userRatingCount` — filter to 10-200 reviews (active but small)
+- `places[].rating` — optional, not strongly correlated with site quality
 
-**Note:** `formatted_phone_number` and `formatted_address` are not returned by Text Search — they require a follow-up Place Details call (`/place/details/json?place_id=...&fields=formatted_phone_number,formatted_address`). Batch these after Stage 1 to avoid hitting the Details API for businesses you'll drop anyway.
+**Note:** Places API (New) only returns the fields named in `X-Goog-FieldMask`, and billing tier follows the fields requested. Website, rating, review count and phone are all in the Enterprise tier, so requesting phone and address in the same call adds no extra tier cost and no separate Place Details call is needed. `nextPageToken` must be in the field mask or pagination stops after page 1.
 
-**Pagination:** Each response returns up to 20 results with a `next_page_token`. Request up to 3 pages (60 results) per query.
+**Pagination:** Each response returns up to 20 results with a `nextPageToken`. Send it back as `pageToken` (with the same `textQuery`) for up to 3 pages (60 results) per query.
 
 **Query templates to run programmatically:**
 ```

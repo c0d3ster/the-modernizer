@@ -12,25 +12,25 @@ import {
 } from './discover-candidates.js'
 
 // Fabricated (not recorded from a live call — no GOOGLE_PLACES_API_KEY is available in
-// this environment) Places API response shapes, matching the fields the doc says Text
-// Search / Place Details return. Used to build against and unit-test the pipeline without
-// network access; see TASKS.md NEEDS HUMAN note for confirming these against a live call.
-const textSearchPage = (
-  results: {
-    place_id: string
-    name: string
-    website?: string
-    user_ratings_total?: number
-    rating?: number
-  }[],
-  nextPageToken?: string
-) => ({
-  results,
-  ...(nextPageToken ? { next_page_token: nextPageToken } : {}),
-})
+// this environment) Places API (New) response shapes, matching the fields requested via
+// the field mask in discover-candidates.ts. Used to build against and unit-test the
+// pipeline without network access; confirm against a live call before trusting them.
+interface FakePlace {
+  id: string
+  name: string
+  websiteUri?: string
+  userRatingCount?: number
+  rating?: number
+  nationalPhoneNumber?: string
+  formattedAddress?: string
+}
 
-const detailsResponse = (formatted_phone_number: string, formatted_address: string) => ({
-  result: { formatted_phone_number, formatted_address },
+const textSearchPage = (
+  places: FakePlace[],
+  nextPageToken?: string
+): { places: unknown[]; nextPageToken?: string } => ({
+  places: places.map(({ name, ...rest }) => ({ ...rest, displayName: { text: name } })),
+  ...(nextPageToken ? { nextPageToken } : {}),
 })
 
 describe('buildPlacesQuery', () => {
@@ -73,6 +73,8 @@ describe('routeStage2', () => {
     website: 'https://example.com',
     reviewCount: 50,
     rating: 4.5,
+    phone: '(512) 555-0100',
+    address: '1 Test St',
     vertical: 'plumber',
   }
 
@@ -172,7 +174,7 @@ describe('fetchAllPagesForQuery', () => {
       ok: true,
       json: async () =>
         textSearchPage(
-          [{ place_id: `p-${Math.random()}`, name: 'Infinite Co', user_ratings_total: 10 }],
+          [{ id: `p-${Math.random()}`, name: 'Infinite Co', userRatingCount: 10 }],
           'always-another-token'
         ),
     })) as unknown as typeof fetch
@@ -185,6 +187,50 @@ describe('fetchAllPagesForQuery', () => {
     expect(fetchImpl).toHaveBeenCalledTimes(3)
     expect(results).toHaveLength(3)
   }, 10000)
+
+  it('POSTs to the Places API (New) with key, field mask, and page token headers/body', async () => {
+    const fetchMock = vi.fn(async (_url: string, _init: RequestInit) => ({
+      ok: true,
+      json: async () => textSearchPage([{ id: 'p1', name: 'One Co' }], 'tok-2'),
+    }))
+    const fetchImpl = fetchMock as unknown as typeof fetch
+
+    await fetchAllPagesForQuery('plumber Austin TX', { apiKey: 'test-key', fetchImpl })
+
+    const [firstCall, secondCall] = fetchMock.mock.calls
+    if (!firstCall || !secondCall) throw new Error('expected two page requests')
+    const [firstUrl, firstInit] = firstCall
+    expect(firstUrl).toBe('https://places.googleapis.com/v1/places:searchText')
+    expect(firstInit.method).toBe('POST')
+    const headers = firstInit.headers as Record<string, string>
+    expect(headers['X-Goog-Api-Key']).toBe('test-key')
+    expect(headers['X-Goog-FieldMask']).toContain('nextPageToken')
+    expect(headers['X-Goog-FieldMask']).toContain('places.websiteUri')
+    expect(JSON.parse(String(firstInit.body))).toEqual({
+      textQuery: 'plumber Austin TX',
+      pageSize: 20,
+    })
+
+    // Second page re-sends the same textQuery plus the token from page 1.
+    expect(JSON.parse(String(secondCall[1].body))).toEqual({
+      textQuery: 'plumber Austin TX',
+      pageSize: 20,
+      pageToken: 'tok-2',
+    })
+  }, 10000)
+
+  it('returns no results when the response omits `places` entirely', async () => {
+    const fetchImpl = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({}),
+    })) as unknown as typeof fetch
+
+    const results = await fetchAllPagesForQuery('nothing Austin TX', {
+      apiKey: 'test-key',
+      fetchImpl,
+    })
+    expect(results).toEqual([])
+  })
 })
 
 describe('runDiscovery', () => {
@@ -199,55 +245,42 @@ describe('runDiscovery', () => {
     if (originalKey) process.env['GOOGLE_PLACES_API_KEY'] = originalKey
   })
 
-  it('dedups, filters, and enriches results end to end with Details calls only for survivors', async () => {
-    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
-      const url = String(input)
-
-      if (url.includes('/textsearch/')) {
-        return {
-          ok: true,
-          json: async () =>
-            textSearchPage([
-              {
-                place_id: 'continuing-1',
-                name: 'Good Plumbing Co',
-                website: 'https://goodplumbing.example.com',
-                user_ratings_total: 42,
-                rating: 4.6,
-              },
-              {
-                place_id: 'greenfield-1',
-                name: 'No Site Plumbing',
-                user_ratings_total: 8,
-                rating: 3.9,
-              },
-              {
-                place_id: 'dropped-chain',
-                name: 'Jiffy Lube',
-                website: 'https://jiffylube.example.com',
-                user_ratings_total: 200,
-              },
-              {
-                place_id: 'dropped-review-count',
-                name: 'Too Few Reviews Co',
-                website: 'https://tinyco.example.com',
-                user_ratings_total: 2,
-              },
-            ]),
-        }
-      }
-
-      if (url.includes('/details/')) {
-        if (url.includes('continuing-1')) {
-          return { ok: true, json: async () => detailsResponse('(512) 555-0101', '1 Good St') }
-        }
-        if (url.includes('greenfield-1')) {
-          return { ok: true, json: async () => detailsResponse('(512) 555-0102', '2 None St') }
-        }
-      }
-
-      throw new Error(`Unexpected fetch: ${url}`)
-    })
+  it('dedups, filters, and maps phone/address from the single Text Search call', async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () =>
+        textSearchPage([
+          {
+            id: 'continuing-1',
+            name: 'Good Plumbing Co',
+            websiteUri: 'https://goodplumbing.example.com',
+            userRatingCount: 42,
+            rating: 4.6,
+            nationalPhoneNumber: '(512) 555-0101',
+            formattedAddress: '1 Good St',
+          },
+          {
+            id: 'greenfield-1',
+            name: 'No Site Plumbing',
+            userRatingCount: 8,
+            rating: 3.9,
+            nationalPhoneNumber: '(512) 555-0102',
+            formattedAddress: '2 None St',
+          },
+          {
+            id: 'dropped-chain',
+            name: 'Jiffy Lube',
+            websiteUri: 'https://jiffylube.example.com',
+            userRatingCount: 200,
+          },
+          {
+            id: 'dropped-review-count',
+            name: 'Too Few Reviews Co',
+            websiteUri: 'https://tinyco.example.com',
+            userRatingCount: 2,
+          },
+        ]),
+    }))
     const fetchImpl = fetchMock as unknown as typeof fetch
 
     const { continuing, greenfield } = await runDiscovery(
@@ -282,11 +315,7 @@ describe('runDiscovery', () => {
       },
     ])
 
-    // Only the 2 survivors (continuing-1, greenfield-1) should trigger a Details call —
-    // the dropped chain and dropped low-review-count results must not.
-    const detailsCalls = fetchMock.mock.calls.filter(([input]) =>
-      String(input).includes('/details/')
-    )
-    expect(detailsCalls).toHaveLength(2)
+    // One query, one page, no follow-up enrichment calls.
+    expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 })
