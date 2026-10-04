@@ -53,3 +53,10 @@ export {
   siteGeneratorPreferencesSchema,
   siteSchemaSchema,
 } from './validation.js'
+
+export {
+  CANDIDATE_SCORE_COLUMNS,
+  candidateScoreSchema,
+  parseCandidatesCsv,
+} from './candidate-score.js'
+export type { CandidateScore } from './candidate-score.js'
