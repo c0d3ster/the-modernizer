@@ -4,21 +4,8 @@ Instructions for agent: This file is the task inventory only. Workflow rules (br
 
 Spec reference: docs/market-discovery.md defines the discovery pipeline, scoring rubric, and output format. Tasks below reference it by section rather than duplicating the spec. If the doc and this file conflict, the doc wins; annotate the conflict here.
 
-**Annotated conflict (2026-08-06):** the PSI task below previously stated PSI weights of performance 0.5/SEO 0.3/accessibility 0.2 and a final split of static×0.40 + psi×0.60. `docs/market-discovery.md` itself states (twice, consistently) `psi_score = performance×0.30 + seo×0.40 + accessibility×0.30` and `final = static_score×0.50 + psi_score×0.50`. The doc's numbers are authoritative and are what's reflected in the task text below.
-
 ## Agent-Ready
 
-- [ ] #3 [stack: discovery] Implement PSI sub-score per docs/market-discovery.md "Sub-score 2: Lighthouse / PSI". Weighted average: performance 0.30, SEO 0.40, accessibility 0.30. Combine into final score: static × 0.50 + psi × 0.50.
-  - Files (in `packages/discovery`): `src/psi-score.ts`, `src/final-score.ts`.
-  - Requires PSI API key. If absent, annotate NEEDS HUMAN with the exact env var name (proposed: `PSI_API_KEY`) — resolve consistently with #4's Places key (separate keys vs. one shared `GOOGLE_API_KEY` covering both APIs) rather than deciding independently.
-  - Static-only fallback: prefer auto-degrade based on key presence (mirrors the existing `GEMINI_API_KEY` pattern in `packages/generator-claude/src/hero-image.ts`) over introducing a new explicit CLI flag; expose a `psiAvailable: boolean` field in the result rather than throwing.
-  - Acceptance: final score computed end to end for a live URL when key is present; unit test that psi_score matches the formula for fixture Lighthouse category scores; Zod-validate the PSI response and define behavior for a malformed/partial result.
-- [ ] #4 [stack: discovery] Implement discovery Stages 1-2 per docs/market-discovery.md "Full Programmatic Pipeline": Google Places Text Search per business type (query templates in doc, pagination up to 3 pages), then dedup + filter (no website, review_count < 5 or > 500, known chains).
-  - Script location: scripts/discover-candidates.ts per the doc (continued by #5 — same file). `scripts/` isn't currently a pnpm workspace member; decide whether to add it to `pnpm-workspace.yaml` with its own package.json (gets lint/test parity, can depend on `@modernizer/schema`) or keep it an ungoverned root script, and document the choice in the PR.
-  - Known-chains detection has no algorithm in the doc beyond two examples (Domino's, Jiffy Lube) — build a starter hardcoded list with case-insensitive substring matching against `name`, documented as a starting point to expand later.
-  - No-website candidates route straight to `greenfield-leads.csv` per the doc's Stage 2, using the doc's `greenfield-leads.csv` schema exactly (`business_name, phone, address, city, state, vertical, review_count, rating, place_id`) — keep that output separate from the continuing-candidate list handed to #5.
-  - Requires Places API key. If absent, annotate NEEDS HUMAN with the exact env var name (proposed: `GOOGLE_PLACES_API_KEY`) and build against recorded fixtures.
-  - Acceptance: given config (city, state, business types), outputs a filtered continuing-candidate list preserving the full Stage 1 record — `name, website, place_id, review_count, phone, address, city, state` — not just the first four fields; downstream `candidates.csv` and the outreach package (#9) need phone/address/city/state too.
 - [ ] #5 [stack: discovery] Implement pipeline Stages 3-5: run static scoring (and PSI when available) against candidates, output ranked CSV matching the "Output Format" column spec exactly, sorted by score ascending.
   - Depends on #1-#4 landing first (imports their modules directly). Export `staticFetch` from `packages/crawler/src/index.ts` (currently package-private) for reuse here and by #1's SSL check.
   - No CSV-writing dependency exists anywhere in the repo — add a small one or hand-roll a serializer.
