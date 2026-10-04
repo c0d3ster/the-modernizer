@@ -1,19 +1,34 @@
 #!/usr/bin/env tsx
-// Market discovery Stages 1-2 per docs/market-discovery.md "Full Programmatic Pipeline".
+// Market discovery pipeline per docs/market-discovery.md "Full Programmatic Pipeline".
 // Stage 1: Google Places API (New) Text Search per business type, paginated up to 3 pages.
 // Phone and address come back in the same call via the field mask, so there is no separate
 // Place Details step.
 // Stage 2: dedup by place_id, then route by website presence / review count / known chain.
-//
-// Continued by `#5`, which adds Stages 3-5 (static + PSI scoring, ranked candidates.csv
-// output) to this same file. `#5` imports `runDiscovery` (and the types below) directly
-// rather than round-tripping through a file, since it runs in the same process.
-import { mkdir, writeFile } from 'node:fs/promises'
+// Stage 3: fetch each continuing candidate's homepage (plain GET, no JS) and compute the
+// static sub-score, including SSL and Wayback staleness.
+// Stage 4: PageSpeed Insights categories when PSI_API_KEY is set (static-only otherwise).
+// Stage 5: rank by final score ascending and write candidates.csv.
+import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 
 import { Command } from 'commander'
-import { createRateLimiter } from '@modernizer/discovery'
+import { staticFetch } from '@modernizer/crawler'
+import type { StaticFetchResult } from '@modernizer/crawler'
+import {
+  computeFinalScore,
+  computeStaleness,
+  computeStaticScore,
+  createRateLimiter,
+  fetchCdxSnapshots,
+  fetchPsiScore,
+} from '@modernizer/discovery'
+import type {
+  CdxSnapshot,
+  PsiScoreResult,
+  StalenessSource,
+  StaticScoreResult,
+} from '@modernizer/discovery'
 import { z } from 'zod'
 
 const PLACES_TEXT_SEARCH_ENDPOINT = 'https://places.googleapis.com/v1/places:searchText'
@@ -242,7 +257,7 @@ export const routeStage2 = (records: RawPlaceResultWithVertical[]): Stage2Routin
 }
 
 // The full Stage 1 record per the doc, preserved (not trimmed to name/website/place_id/
-// review_count) so #5's candidates.csv and #9's outreach package have phone/address/
+// review_count) so candidates.csv and #9's outreach package have phone/address/
 // city/state available.
 export interface ContinuingCandidate {
   name: string
@@ -334,12 +349,13 @@ export const runDiscovery = async (
   return { continuing, greenfield }
 }
 
-const csvEscape = (value: string | number): string => {
+const csvEscape = (value: string | number | boolean): string => {
   const str = String(value)
   return /[",\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str
 }
 
-const toCsvRow = (values: (string | number)[]): string => values.map(csvEscape).join(',')
+const toCsvRow = (values: (string | number | boolean)[]): string =>
+  values.map(csvEscape).join(',')
 
 const GREENFIELD_CSV_HEADER = [
   'business_name',
@@ -374,11 +390,280 @@ export const writeGreenfieldCsv = async (leads: GreenfieldLead[], filePath: stri
   await writeFile(filePath, greenfieldLeadsToCsv(leads), 'utf-8')
 }
 
+// ---------------------------------------------------------------------------
+// Stages 3-5: score continuing candidates and output the ranked candidates.csv
+// ---------------------------------------------------------------------------
+
+// PSI dominates wall-clock time (several seconds up to ~60s per URL), so candidates are
+// scored a few at a time. Wayback CDX calls stay at 1 req/sec regardless, via the
+// module-level rate limiter in @modernizer/discovery's fetchCdxSnapshots.
+const DEFAULT_SCORING_CONCURRENCY = 4
+
+export interface HomepageFetch {
+  html: string
+  url: string
+  noSsl: boolean
+}
+
+const withScheme = (url: string): string => (/^https?:\/\//i.test(url) ? url : `https://${url}`)
+
+/**
+ * Fetches a candidate's homepage, probing https first so `no_ssl` can be detected per the
+ * doc ("https:// fetch fails or returns a cert error"). Falls back to http so the other
+ * signals can still be scored on a site with no SSL. If the http fetch redirects back to
+ * https, SSL does work and only the first probe failed, so `noSsl` stays false.
+ * Returns null when neither fetch yields usable HTML (unreachable, non-2xx, or a page too
+ * thin for staticFetch's visible-text threshold).
+ */
+export const fetchHomepage = async (
+  website: string,
+  fetchPage: (url: string) => Promise<StaticFetchResult | null> = staticFetch
+): Promise<HomepageFetch | null> => {
+  const httpsUrl = withScheme(website).replace(/^http:\/\//i, 'https://')
+
+  const httpsResult = await fetchPage(httpsUrl)
+  if (httpsResult) {
+    return { html: httpsResult.html, url: httpsResult.finalUrl, noSsl: false }
+  }
+
+  const httpResult = await fetchPage(httpsUrl.replace(/^https:\/\//i, 'http://'))
+  if (!httpResult) return null
+
+  return {
+    html: httpResult.html,
+    url: httpResult.finalUrl,
+    noSsl: !/^https:\/\//i.test(httpResult.finalUrl),
+  }
+}
+
+// Places website URIs often carry tracking params (e.g. `?utm_source=gmb`), and Wayback
+// indexes by exact URL, so staleness is looked up on host + path only.
+export const toWaybackLookupUrl = (url: string): string => {
+  try {
+    const { host, pathname } = new URL(url)
+    return `${host}${pathname === '/' ? '' : pathname}`
+  } catch {
+    return url
+  }
+}
+
+export interface ScoredCandidate extends ContinuingCandidate {
+  score: number
+  psiAvailable: boolean
+  staticScore: StaticScoreResult
+  lastChanged: string | null
+  stalenessSource: StalenessSource
+  psi: PsiScoreResult | null
+}
+
+export interface ScoringOptions {
+  fetchPage?: (url: string) => Promise<StaticFetchResult | null>
+  fetchSnapshots?: (url: string) => Promise<CdxSnapshot[]>
+  fetchPsi?: (url: string) => Promise<PsiScoreResult | null>
+  concurrency?: number
+  now?: Date
+  onProgress?: (event: ScoringProgress) => void
+}
+
+export interface ScoringProgress {
+  candidate: ContinuingCandidate
+  completed: number
+  total: number
+  scored: ScoredCandidate | null
+}
+
+export interface ScoringResult {
+  // Sorted by score ascending: lowest score = best modernization prospect.
+  ranked: ScoredCandidate[]
+  // Candidates whose homepage couldn't be fetched at all, so they have no score.
+  unreachable: ContinuingCandidate[]
+}
+
+export const scoreCandidate = async (
+  candidate: ContinuingCandidate,
+  {
+    fetchPage = staticFetch,
+    fetchSnapshots = fetchCdxSnapshots,
+    fetchPsi = fetchPsiScore,
+    now = new Date(),
+  }: ScoringOptions = {}
+): Promise<ScoredCandidate | null> => {
+  // Stage 3: plain GET + static signals (SSL, viewport, staleness, etc.)
+  const homepage = await fetchHomepage(candidate.website, fetchPage)
+  if (!homepage) return null
+
+  const staleness = await computeStaleness(toWaybackLookupUrl(homepage.url), homepage.html, {
+    fetchSnapshots,
+    now,
+  })
+  const staticScore = computeStaticScore({
+    html: homepage.html,
+    noSsl: homepage.noSsl,
+    stalenessWeight: staleness.stalenessWeight,
+  })
+
+  // Stage 4: PSI. fetchPsiScore returns null without a key or on any failure.
+  const psi = await fetchPsi(homepage.url)
+  const final = computeFinalScore({ staticScore: staticScore.score, psiScore: psi })
+
+  return {
+    ...candidate,
+    score: final.score,
+    psiAvailable: final.psiAvailable,
+    staticScore,
+    lastChanged: staleness.lastChanged,
+    stalenessSource: staleness.source,
+    psi,
+  }
+}
+
+const mapWithConcurrency = async <T, R>(
+  items: T[],
+  limit: number,
+  fn: (item: T) => Promise<R>
+): Promise<R[]> => {
+  const results: R[] = []
+  let nextIndex = 0
+
+  const worker = async (): Promise<void> => {
+    while (nextIndex < items.length) {
+      const index = nextIndex++
+      const item = items[index] as T
+      results[index] = await fn(item)
+    }
+  }
+
+  const workerCount = Math.max(1, Math.min(limit, items.length))
+  await Promise.all(Array.from({ length: workerCount }, worker))
+  return results
+}
+
+// Stage 5 ordering. Array.prototype.sort is stable, so ties keep discovery order.
+export const rankCandidates = (candidates: ScoredCandidate[]): ScoredCandidate[] =>
+  [...candidates].sort((a, b) => a.score - b.score)
+
+export const scoreCandidates = async (
+  candidates: ContinuingCandidate[],
+  options: ScoringOptions = {}
+): Promise<ScoringResult> => {
+  const { concurrency = DEFAULT_SCORING_CONCURRENCY, onProgress } = options
+  let completed = 0
+
+  const results = await mapWithConcurrency(candidates, concurrency, async (candidate) => {
+    const scored = await scoreCandidate(candidate, options)
+    completed++
+    onProgress?.({ candidate, completed, total: candidates.length, scored })
+    return { candidate, scored }
+  })
+
+  const scored = results.flatMap(({ scored }) => (scored ? [scored] : []))
+  const unreachable = results.flatMap(({ candidate, scored }) => (scored ? [] : [candidate]))
+
+  return { ranked: rankCandidates(scored), unreachable }
+}
+
+// Column order per docs/market-discovery.md "Output Format" > candidates.csv, exactly.
+export const CANDIDATES_CSV_HEADER = [
+  'business_name',
+  'phone',
+  'address',
+  'city',
+  'state',
+  'url',
+  'score',
+  'no_ssl',
+  'no_viewport',
+  'last_changed',
+  'old_jquery',
+  'old_wp_theme',
+  'no_og_tags',
+  'table_layout',
+  'ie_compatible',
+  'static_score',
+  'psi_score',
+  'psi_performance',
+  'psi_seo',
+  'psi_accessibility',
+  'notes',
+] as const
+
+const roundScore = (value: number): number => Math.round(value * 10) / 10
+
+const buildCandidateNotes = (candidate: ScoredCandidate): string => {
+  const parts = candidate.staticScore.notes ? [candidate.staticScore.notes] : []
+  if (candidate.stalenessSource === 'copyright-fallback') {
+    parts.push('staleness: copyright fallback (no Wayback data)')
+  }
+  if (!candidate.psiAvailable) parts.push('psi: unavailable, static-only score')
+  return parts.join(', ')
+}
+
+export const candidatesToCsv = (candidates: ScoredCandidate[]): string => {
+  const rows = candidates.map((candidate) => {
+    const { staticScore, psi } = candidate
+    return toCsvRow([
+      candidate.name,
+      candidate.phone,
+      candidate.address,
+      candidate.city,
+      candidate.state,
+      candidate.website,
+      roundScore(candidate.score),
+      staticScore.noSsl,
+      staticScore.noViewport,
+      candidate.lastChanged ?? '',
+      staticScore.oldJquery,
+      staticScore.oldWpTheme,
+      staticScore.noOgTags,
+      staticScore.tableLayout,
+      staticScore.ieCompatible,
+      roundScore(staticScore.score),
+      psi ? roundScore(psi.score) : '',
+      psi ? roundScore(psi.performance) : '',
+      psi ? roundScore(psi.seo) : '',
+      psi ? roundScore(psi.accessibility) : '',
+      buildCandidateNotes(candidate),
+    ])
+  })
+  return [toCsvRow([...CANDIDATES_CSV_HEADER]), ...rows].join('\n') + '\n'
+}
+
+export const writeCandidatesCsv = async (
+  candidates: ScoredCandidate[],
+  filePath: string
+): Promise<void> => {
+  await writeFile(filePath, candidatesToCsv(candidates), 'utf-8')
+}
+
+// Validates the interim continuing-candidates.json handoff file (written by a previous
+// Stage 1-2 run) before scoring it, so a stale or hand-edited file fails loudly.
+const ContinuingCandidatesFileSchema = z.array(
+  z.object({
+    name: z.string(),
+    website: z.string().min(1),
+    placeId: z.string(),
+    reviewCount: z.number(),
+    phone: z.string(),
+    address: z.string(),
+    city: z.string(),
+    state: z.string(),
+  })
+)
+
+export const readContinuingCandidates = async (
+  filePath: string
+): Promise<ContinuingCandidate[]> => {
+  const json: unknown = JSON.parse(await readFile(filePath, 'utf-8'))
+  return ContinuingCandidatesFileSchema.parse(json)
+}
+
 interface CliOptions {
-  city: string
-  state: string
+  city?: string
+  state?: string
   types?: string
   outDir: string
+  fromCandidates?: string
+  concurrency: string
 }
 
 const program = new Command()
@@ -386,14 +671,27 @@ const program = new Command()
 program
   .name('discover-candidates')
   .description(
-    'Stage 1-2 of the market-discovery pipeline: Google Places (New) search, dedup, and filter (see docs/market-discovery.md)'
+    'Market-discovery pipeline (see docs/market-discovery.md): Google Places (New) search, dedup, and filter, then static + PSI scoring into a ranked candidates.csv'
   )
-  .requiredOption('--city <city>', 'City to search')
-  .requiredOption('--state <state>', 'State to search (e.g. TX)')
+  .option('--city <city>', 'City to search (required unless --from-candidates)')
+  .option('--state <state>', 'State to search, e.g. TX (required unless --from-candidates)')
   .option('--types <types>', "Comma-separated business types (default: the doc's target verticals)")
   .option('--out-dir <dir>', 'Directory to write output files to', '.')
+  .option(
+    '--from-candidates <path>',
+    'Skip Stages 1-2 and score a continuing-candidates.json from a previous run (no Places API cost)'
+  )
+  .option('--concurrency <n>', 'Candidates scored in parallel', String(DEFAULT_SCORING_CONCURRENCY))
 
-program.action(async (opts: CliOptions) => {
+const loadCandidates = async (
+  opts: CliOptions
+): Promise<ContinuingCandidate[]> => {
+  if (opts.fromCandidates) return readContinuingCandidates(opts.fromCandidates)
+
+  if (!opts.city || !opts.state) {
+    throw new Error('--city and --state are required unless --from-candidates is given')
+  }
+
   const config: DiscoveryConfig = {
     city: opts.city,
     state: opts.state,
@@ -402,22 +700,52 @@ program.action(async (opts: CliOptions) => {
       : DEFAULT_BUSINESS_TYPES,
   }
 
+  const { continuing, greenfield } = await runDiscovery(config)
+
+  const greenfieldPath = path.join(opts.outDir, 'greenfield-leads.csv')
+  await writeGreenfieldCsv(greenfield, greenfieldPath)
+
+  // Stage 2 -> 3 handoff file, so scoring can be re-run with --from-candidates without
+  // repeating the Places API cost.
+  const continuingPath = path.join(opts.outDir, 'continuing-candidates.json')
+  await writeFile(continuingPath, JSON.stringify(continuing, null, 2), 'utf-8')
+
+  process.stdout.write(
+    `Discovered ${continuing.length} continuing candidate(s) -> ${continuingPath}\n` +
+      `Discovered ${greenfield.length} greenfield lead(s) -> ${greenfieldPath}\n`
+  )
+  return continuing
+}
+
+program.action(async (opts: CliOptions) => {
   try {
-    const { continuing, greenfield } = await runDiscovery(config)
+    const concurrency = Number.parseInt(opts.concurrency, 10)
+    if (!Number.isInteger(concurrency) || concurrency < 1) {
+      throw new Error('--concurrency must be a positive integer')
+    }
 
     await mkdir(opts.outDir, { recursive: true })
+    const candidates = await loadCandidates(opts)
 
-    const greenfieldPath = path.join(opts.outDir, 'greenfield-leads.csv')
-    await writeGreenfieldCsv(greenfield, greenfieldPath)
+    if (!process.env['PSI_API_KEY']) {
+      process.stderr.write('PSI_API_KEY is not set: scores will be static-only.\n')
+    }
 
-    // Interim Stage 2 -> Stage 3 handoff file so a local re-run doesn't repeat the Places
-    // API cost while #5 is under development. #5 can also import runDiscovery directly.
-    const continuingPath = path.join(opts.outDir, 'continuing-candidates.json')
-    await writeFile(continuingPath, JSON.stringify(continuing, null, 2), 'utf-8')
+    const { ranked, unreachable } = await scoreCandidates(candidates, {
+      concurrency,
+      onProgress: ({ candidate, completed, total, scored }) => {
+        const outcome = scored ? `score ${roundScore(scored.score)}` : 'unreachable, skipped'
+        process.stderr.write(`[${completed}/${total}] ${candidate.name}: ${outcome}\n`)
+      },
+    })
+
+    const candidatesPath = path.join(opts.outDir, 'candidates.csv')
+    await writeCandidatesCsv(ranked, candidatesPath)
 
     process.stdout.write(
-      `Discovered ${continuing.length} continuing candidate(s) -> ${continuingPath}\n` +
-        `Discovered ${greenfield.length} greenfield lead(s) -> ${greenfieldPath}\n`
+      `Scored ${ranked.length} candidate(s) -> ${candidatesPath}` +
+        (unreachable.length ? ` (${unreachable.length} unreachable, skipped)` : '') +
+        '\n'
     )
   } catch (err) {
     process.stderr.write(`\nError: ${err instanceof Error ? err.message : String(err)}\n`)
@@ -425,8 +753,8 @@ program.action(async (opts: CliOptions) => {
   }
 })
 
-// Only parse argv when run directly — #5 (and this file's own tests) import the functions
-// above without wanting commander to execute a CLI action as a side effect. Comparing via
+// Only parse argv when run directly — this file's own tests import the functions above
+// without wanting commander to execute a CLI action as a side effect. Comparing via
 // pathToFileURL (rather than a manual `file://${...}` template) is required on Windows,
 // where process.argv[1] is backslash-separated and wouldn't otherwise match import.meta.url.
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
