@@ -1,4 +1,4 @@
-import type { SiteSchema } from '@modernizer/schema'
+import type { CandidateScore, SiteSchema } from '@modernizer/schema'
 import { urlToRoutePath, urlToComponentName } from './route-mapper.js'
 
 const mdTableCell = (s: string): string => s.replace(/\|/g, '\\|')
@@ -35,9 +35,74 @@ const countBlocks = (schema: SiteSchema): Record<string, number> => {
   return counts
 }
 
+// Thresholds per docs/market-discovery.md "Final score formula".
+const scoreVerdict = (score: number): string => {
+  if (score <= 40) return 'Strong candidate: clear visual case for modernization'
+  if (score <= 60) return 'Moderate candidate: worth a closer look'
+  return 'Already fairly modern: a harder pitch'
+}
+
+const formatScore = (score: number | null): string => (score === null ? 'n/a' : `${score}`)
+
+const yesNo = (fired: boolean): string => (fired ? 'Yes' : 'No')
+
+// Signal descriptions per docs/market-discovery.md "Sub-score 1: Static HTML".
+const staticSignalRows = (candidate: CandidateScore): string[] => [
+  `| No HTTPS / expired SSL | ${yesNo(candidate.no_ssl)} |`,
+  `| No viewport meta tag (not mobile-ready) | ${yesNo(candidate.no_viewport)} |`,
+  `| Old jQuery (1.x / 2.x) | ${yesNo(candidate.old_jquery)} |`,
+  `| Old default WordPress theme | ${yesNo(candidate.old_wp_theme)} |`,
+  `| Table-based layout | ${yesNo(candidate.table_layout)} |`,
+  `| No Open Graph tags | ${yesNo(candidate.no_og_tags)} |`,
+  `| IE compatibility meta tag | ${yesNo(candidate.ie_compatible)} |`,
+]
+
+const renderScoreSection = (candidate: CandidateScore): string => {
+  const psiAvailable = candidate.psi_performance !== null
+  const subScoreRows = [
+    `| Static HTML | ${formatScore(candidate.static_score)} | 25% |`,
+    `| Performance (Lighthouse, mobile) | ${formatScore(candidate.psi_performance)} | 25% |`,
+    `| SEO (Lighthouse) | ${formatScore(candidate.psi_seo)} | 25% |`,
+    `| Accessibility (Lighthouse) | ${formatScore(candidate.psi_accessibility)} | 25% |`,
+  ].join('\n')
+
+  const psiNote = psiAvailable
+    ? `PSI composite (informational, not part of the final score): ${formatScore(candidate.psi_score)}`
+    : 'PageSpeed Insights data was unavailable for this site, so the final score is the static HTML score alone.'
+
+  const staleness = candidate.last_changed
+    ? `Content last changed **${candidate.last_changed}** (Wayback Machine).`
+    : 'No Wayback Machine history for this site; staleness is estimated from the copyright year where present.'
+
+  return `## Modernization Score
+
+**${candidate.score} / 100** (100 = fully modern, lower = stronger case for modernization). ${scoreVerdict(candidate.score)}.
+
+| Sub-score | Score | Weight |
+|-----------|-------|--------|
+${subScoreRows}
+
+${psiNote}
+
+### Static HTML Signals
+
+| Signal | Detected |
+|--------|----------|
+${staticSignalRows(candidate).join('\n')}
+
+### Staleness
+
+${staleness}
+${candidate.notes ? `\nScoring notes: ${mdTableCell(candidate.notes)}\n` : ''}
+`
+}
+
 export const generateReport = (
   schema: SiteSchema,
-  nav: Array<{ label: string; url: string }>
+  nav: Array<{ label: string; url: string }>,
+  // Optional market-discovery score for this site (a candidates.csv row). Omitted for
+  // ad-hoc and --from-schema runs, where the report renders exactly as before.
+  candidateScore?: CandidateScore
 ): string => {
   const { siteName, rootUrl, tagline, brandColors, pages } = schema
   const blockCounts = countBlocks(schema)
@@ -80,7 +145,7 @@ This run does **not** aim for a pixel-perfect copy of the source site. Legacy ma
 - **Pages crawled**: ${pages.length}
 - **Total content blocks extracted**: ${totalBlocks}
 
-## What Changed
+${candidateScore ? `${renderScoreSection(candidateScore)}\n` : ''}## What Changed
 
 The source was likely a static or CMS-driven site with legacy HTML and CSS. Below is how that content was **restructured into a typed schema** and **regenerated** as a Next.js 15 app (React, Tailwind CSS v4, shadcn-style components)—a new presentation layer, not a clone of the original layout.
 
