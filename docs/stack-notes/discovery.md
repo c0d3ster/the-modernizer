@@ -151,3 +151,62 @@ single-file package)
   Stage 1 record, separate `greenfield-leads.csv` with the doc's exact schema, pagination
   capped at 3 pages, dedup, known-chain starter list — are implemented and covered by
   `scripts/discover-candidates.test.ts` (15 tests, all passing).
+
+## `#5` Implement pipeline Stages 3-5 (scoring + ranked candidates.csv)
+
+Branch: overnight/2026-10-04/r2-01-t05-scored-candidates-csv
+
+### Decisions
+
+- **Same file as `#4`:** Stages 3-5 live in `scripts/discover-candidates.ts` per the task
+  text. The CLI now runs Stages 1-5 in one go; `--from-candidates <json>` skips Stages
+  1-2 and scores a previous run's `continuing-candidates.json` (Zod-validated) so a
+  re-score never repeats Places API cost. `--concurrency <n>` (default 4).
+- **Homepage fetch reuses the crawler's `staticFetch`** (now exported from
+  `@modernizer/crawler` along with `StaticFetchResult`). `fetchHomepage` probes https
+  first; if that yields nothing it falls back to http and sets `noSsl` unless the http
+  fetch redirected back to https. Side effect of reusing `staticFetch`: pages with under
+  200 chars of visible text (splash pages, JS-only shells) return null and the candidate
+  is reported as unreachable rather than scored. Also, a site whose https fetch fails for
+  a non-SSL reason (5xx, thin content) but whose http fetch works is flagged `no_ssl`;
+  `staticFetch` returns null for every failure, so the two can't be told apart.
+- **Concurrency:** candidates are scored through a small worker pool because PSI takes
+  seconds up to ~60s per URL. `createRateLimiter` was not safe under concurrent callers
+  (callers in the same tick all woke after one interval), which would have burst
+  Wayback past 1 req/sec; fixed in `@modernizer/discovery` by reserving slots
+  synchronously. Sequential behavior is unchanged.
+- **Wayback lookup URL:** `toWaybackLookupUrl` drops scheme, query string, and a bare
+  `/` path, since Places website URIs often carry `?utm_source=...` and Wayback indexes
+  by exact URL. Uses the post-redirect URL from the fetch.
+- **Unreachable candidates** are excluded from `candidates.csv` (no score to rank) and
+  counted in the CLI summary.
+- **CSV formatting:** hand-rolled (reuses `#4`'s `csvEscape`/`toCsvRow`, now accepting
+  booleans). Scores rounded to one decimal; booleans as `true`/`false`; PSI columns
+  empty when PSI is unavailable; `last_changed` empty without Wayback data. `notes`
+  appends `staleness: copyright fallback (no Wayback data)` and
+  `psi: unavailable, static-only score` where relevant, since a static-only score isn't
+  directly comparable to a full one in the same CSV.
+- **`url` column** is the Places website as given, not the post-redirect URL.
+
+### Interfaces / exports created (all in `scripts/discover-candidates.ts`)
+
+- `fetchHomepage(website, fetchPage?) => Promise<HomepageFetch | null>`,
+  `toWaybackLookupUrl(url)`.
+- `scoreCandidate(candidate, options?) => Promise<ScoredCandidate | null>`,
+  `scoreCandidates(candidates, options?) => Promise<ScoringResult>` (`{ ranked,
+  unreachable }`), `rankCandidates`. `ScoringOptions` takes injectable `fetchPage`,
+  `fetchSnapshots`, `fetchPsi`, `now`, plus `concurrency` and `onProgress`.
+- `ScoredCandidate` extends `ContinuingCandidate` with `score`, `psiAvailable`,
+  `staticScore` (`StaticScoreResult`), `lastChanged`, `stalenessSource`, `psi`. `#6`'s
+  `CandidateScore` schema type should model the CSV row (`CANDIDATES_CSV_HEADER`), not
+  this in-memory shape.
+- `CANDIDATES_CSV_HEADER`, `candidatesToCsv`, `writeCandidatesCsv`,
+  `readContinuingCandidates`.
+
+### Deviations from acceptance criteria
+
+- None in what's tested. The full pipeline is covered end to end in
+  `scripts/discover-candidates.integration.test.ts` against fabricated fixtures (4 sites
+  on an in-process HTTP server, fake Places responses, stubbed Wayback/PSI). No live run
+  was done in this session (no `PSI_API_KEY`/`GOOGLE_PLACES_API_KEY` here), so a live
+  scoring run is still worth doing before relying on the output.
