@@ -48,4 +48,21 @@ describe('createRateLimiter', () => {
 
     expect(Date.now() - start).toBe(0)
   })
+
+  it('spaces out concurrent callers instead of releasing them together', async () => {
+    const limit = createRateLimiter(1000)
+    const start = Date.now()
+    const releasedAt: number[] = []
+
+    const calls = [limit(), limit(), limit()].map((call) =>
+      call.then(() => {
+        releasedAt.push(Date.now() - start)
+      })
+    )
+
+    await vi.advanceTimersByTimeAsync(2000)
+    await Promise.all(calls)
+
+    expect(releasedAt).toEqual([0, 1000, 2000])
+  })
 })
