@@ -229,7 +229,7 @@ Stage 5 — Output ranked CSV
 - `candidates.csv` — businesses with a website, sorted by modernity score (low = best prospect). Top candidates feed into `pnpm modernize`.
 - `greenfield-leads.csv` — businesses with no website at all. Direct outreach for a new build; route to c0d3ster for project provisioning.
 
-**Estimated run time:** dominated by PSI API latency, not the ~2s originally assumed — a sequential run of 200 URLs at several seconds to ~60s each could take well over an hour. The batch pipeline (#5 in TASKS.md, not yet built) will need concurrency/rate-limiting design to stay practical at this scale; PSI's own limit is 25,000 queries/day (plenty of headroom), so the bottleneck is wall-clock time per call, not quota.
+**Estimated run time:** dominated by PSI API latency, not the ~2s originally assumed — a sequential run of 200 URLs at several seconds to ~60s each could take well over an hour. `scripts/discover-candidates.ts` scores candidates 4 at a time by default (`--concurrency`), with Wayback CDX calls still held to 1 req/sec by a shared rate limiter; PSI's own limit is 25,000 queries/day (plenty of headroom), so the bottleneck is wall-clock time per call, not quota.
 
 ---
 

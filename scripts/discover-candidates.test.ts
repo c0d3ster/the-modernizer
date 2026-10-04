@@ -1,14 +1,27 @@
+import { mkdtemp, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
+
 import { describe, expect, it, vi } from 'vitest'
 
 import {
   buildPlacesQuery,
+  candidatesToCsv,
+  fetchHomepage,
+  rankCandidates,
+  readContinuingCandidates,
+  scoreCandidate,
+  scoreCandidates,
+  toWaybackLookupUrl,
   dedupeByPlaceId,
   fetchAllPagesForQuery,
   greenfieldLeadsToCsv,
   isKnownChain,
   routeStage2,
   runDiscovery,
+  type ContinuingCandidate,
   type RawPlaceResultWithVertical,
+  type ScoredCandidate,
 } from './discover-candidates.js'
 
 // Fabricated (not recorded from a live call — no GOOGLE_PLACES_API_KEY is available in
@@ -317,5 +330,262 @@ describe('runDiscovery', () => {
 
     // One query, one page, no follow-up enrichment calls.
     expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+})
+
+const fetchResult = (
+  finalUrl: string,
+  html = '<html></html>'
+): { html: string; statusCode: number; finalUrl: string } => ({
+  html,
+  statusCode: 200,
+  finalUrl,
+})
+
+describe('fetchHomepage', () => {
+  it('uses https when it works and reports SSL present', async () => {
+    const fetchPage = vi.fn(async (url: string) => fetchResult(url))
+    const result = await fetchHomepage('http://example.com', fetchPage)
+
+    expect(fetchPage).toHaveBeenCalledTimes(1)
+    expect(fetchPage).toHaveBeenCalledWith('https://example.com')
+    expect(result).toEqual({ html: '<html></html>', url: 'https://example.com', noSsl: false })
+  })
+
+  it('adds an https scheme to bare domains', async () => {
+    const fetchPage = vi.fn(async (url: string) => fetchResult(url))
+    await fetchHomepage('example.com', fetchPage)
+    expect(fetchPage).toHaveBeenCalledWith('https://example.com')
+  })
+
+  it('falls back to http and flags no_ssl when https fails', async () => {
+    const fetchPage = vi.fn(async (url: string) =>
+      url.startsWith('https://') ? null : fetchResult(url)
+    )
+    const result = await fetchHomepage('https://example.com', fetchPage)
+
+    expect(fetchPage).toHaveBeenLastCalledWith('http://example.com')
+    expect(result?.noSsl).toBe(true)
+  })
+
+  it('does not flag no_ssl when the http fallback redirects to https', async () => {
+    const fetchPage = vi.fn(async (url: string) =>
+      url.startsWith('https://') ? null : fetchResult('https://example.com/')
+    )
+    const result = await fetchHomepage('https://example.com', fetchPage)
+    expect(result?.noSsl).toBe(false)
+  })
+
+  it('returns null when neither fetch yields HTML', async () => {
+    const fetchPage = vi.fn(async () => null)
+    expect(await fetchHomepage('https://example.com', fetchPage)).toBeNull()
+  })
+})
+
+describe('toWaybackLookupUrl', () => {
+  it('strips scheme, query, and a bare root path', () => {
+    expect(toWaybackLookupUrl('https://example.com/?utm_source=gmb')).toBe('example.com')
+  })
+
+  it('keeps a non-root path', () => {
+    expect(toWaybackLookupUrl('https://example.com/austin/?ref=x')).toBe('example.com/austin/')
+  })
+
+  it('returns unparseable input unchanged', () => {
+    expect(toWaybackLookupUrl('not a url')).toBe('not a url')
+  })
+})
+
+const baseCandidate: ContinuingCandidate = {
+  name: 'Good Plumbing Co',
+  website: 'https://goodplumbing.example.com',
+  placeId: 'p1',
+  reviewCount: 42,
+  phone: '(512) 555-0101',
+  address: '1 Good St, Austin, TX',
+  city: 'Austin',
+  state: 'TX',
+}
+
+const MODERN_HTML = `<html><head>
+  <meta name="viewport" content="width=device-width">
+  <meta property="og:title" content="Modern">
+</head><body><p>Modern site</p></body></html>`
+
+describe('scoreCandidate', () => {
+  const now = new Date('2026-01-01T00:00:00Z')
+
+  it('returns a static-only score when PSI is unavailable', async () => {
+    const scored = await scoreCandidate(baseCandidate, {
+      fetchPage: async (url) => fetchResult(url, MODERN_HTML),
+      fetchSnapshots: async () => [],
+      fetchPsi: async () => null,
+      now,
+    })
+
+    expect(scored?.psiAvailable).toBe(false)
+    expect(scored?.score).toBe(100)
+    expect(scored?.staticScore.score).toBe(100)
+    expect(scored?.stalenessSource).toBe('none')
+  })
+
+  it('combines static and PSI categories at 25% each', async () => {
+    const scored = await scoreCandidate(baseCandidate, {
+      fetchPage: async (url) => fetchResult(url, MODERN_HTML),
+      fetchSnapshots: async () => [],
+      fetchPsi: async () => ({ performance: 40, seo: 60, accessibility: 80, score: 61 }),
+      now,
+    })
+
+    expect(scored?.psiAvailable).toBe(true)
+    expect(scored?.score).toBe(100 * 0.25 + 40 * 0.25 + 60 * 0.25 + 80 * 0.25)
+  })
+
+  it('looks up staleness on the fetched URL without query params', async () => {
+    const fetchSnapshots = vi.fn(async () => [{ timestamp: '20200101000000', digest: 'a' }])
+    const scored = await scoreCandidate(
+      { ...baseCandidate, website: 'https://goodplumbing.example.com/?utm_source=gmb' },
+      {
+        fetchPage: async (url) => fetchResult(url, MODERN_HTML),
+        fetchSnapshots,
+        fetchPsi: async () => null,
+        now,
+      }
+    )
+
+    expect(fetchSnapshots).toHaveBeenCalledWith('goodplumbing.example.com')
+    expect(scored?.lastChanged).toBe('2020-01-01')
+    // 6 years stale -> capped 20-point staleness weight
+    expect(scored?.staticScore.score).toBe(80)
+  })
+
+  it('returns null when the homepage is unreachable', async () => {
+    const scored = await scoreCandidate(baseCandidate, {
+      fetchPage: async () => null,
+      fetchSnapshots: async () => [],
+      fetchPsi: async () => null,
+    })
+    expect(scored).toBeNull()
+  })
+})
+
+const scoredFixture = (overrides: Partial<ScoredCandidate> = {}): ScoredCandidate => ({
+  ...baseCandidate,
+  score: 50,
+  psiAvailable: false,
+  staticScore: {
+    score: 50,
+    noSsl: false,
+    noViewport: true,
+    oldJquery: false,
+    oldWpTheme: false,
+    noOgTags: true,
+    tableLayout: false,
+    ieCompatible: false,
+    notes: 'no_viewport, no_og_tags',
+  },
+  lastChanged: null,
+  stalenessSource: 'none',
+  psi: null,
+  ...overrides,
+})
+
+describe('rankCandidates', () => {
+  it('sorts by score ascending and keeps ties in input order', () => {
+    const ranked = rankCandidates([
+      scoredFixture({ name: 'C', score: 70 }),
+      scoredFixture({ name: 'A1', score: 30 }),
+      scoredFixture({ name: 'B', score: 50 }),
+      scoredFixture({ name: 'A2', score: 30 }),
+    ])
+    expect(ranked.map(({ name }) => name)).toEqual(['A1', 'A2', 'B', 'C'])
+  })
+})
+
+describe('scoreCandidates', () => {
+  it('ranks reachable candidates and separates unreachable ones', async () => {
+    const pages: Record<string, string> = {
+      'https://modern.example.com': MODERN_HTML,
+      'https://old.example.com': '<html><body><table><tr><td>Old</td></tr></table></body></html>',
+    }
+    const progress: number[] = []
+
+    const { ranked, unreachable } = await scoreCandidates(
+      [
+        { ...baseCandidate, name: 'Modern', website: 'https://modern.example.com' },
+        { ...baseCandidate, name: 'Gone', website: 'https://gone.example.com' },
+        { ...baseCandidate, name: 'Old', website: 'https://old.example.com' },
+      ],
+      {
+        fetchPage: async (url) => {
+          const html = pages[url]
+          return html ? fetchResult(url, html) : null
+        },
+        fetchSnapshots: async () => [],
+        fetchPsi: async () => null,
+        concurrency: 2,
+        onProgress: ({ completed }) => progress.push(completed),
+      }
+    )
+
+    expect(ranked.map(({ name }) => name)).toEqual(['Old', 'Modern'])
+    expect(unreachable.map(({ name }) => name)).toEqual(['Gone'])
+    expect(progress.sort()).toEqual([1, 2, 3])
+  })
+})
+
+describe('candidatesToCsv', () => {
+  it('writes the doc-specified header in exact order', () => {
+    const [header] = candidatesToCsv([]).split('\n')
+    expect(header).toBe(
+      'business_name,phone,address,city,state,url,score,no_ssl,no_viewport,last_changed,' +
+        'old_jquery,old_wp_theme,no_og_tags,table_layout,ie_compatible,static_score,' +
+        'psi_score,psi_performance,psi_seo,psi_accessibility,notes'
+    )
+  })
+
+  it('leaves PSI columns empty and notes static-only when PSI is unavailable', () => {
+    const [, row] = candidatesToCsv([scoredFixture()]).split('\n')
+    expect(row).toBe(
+      'Good Plumbing Co,(512) 555-0101,"1 Good St, Austin, TX",Austin,TX,' +
+        'https://goodplumbing.example.com,50,false,true,,false,false,true,false,false,50,' +
+        ',,,,"no_viewport, no_og_tags, psi: unavailable, static-only score"'
+    )
+  })
+
+  it('fills PSI columns rounded to one decimal when available', () => {
+    const [, row] = candidatesToCsv([
+      scoredFixture({
+        address: '1 Good St',
+        score: 47.123,
+        psiAvailable: true,
+        psi: { performance: 41.5, seo: 92, accessibility: 77.77, score: 72.58 },
+        lastChanged: '2019-04-02',
+        stalenessSource: 'wayback',
+      }),
+    ]).split('\n')
+
+    const cells = row?.split(',') ?? []
+    expect(cells[6]).toBe('47.1')
+    expect(cells[9]).toBe('2019-04-02')
+    expect(row).toContain(',72.6,41.5,92,77.8,')
+  })
+})
+
+describe('readContinuingCandidates', () => {
+  it('rejects a file that does not match the continuing-candidate shape', async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), 'discover-'))
+    const filePath = path.join(dir, 'continuing-candidates.json')
+    await writeFile(filePath, JSON.stringify([{ name: 'Missing fields' }]), 'utf-8')
+
+    await expect(readContinuingCandidates(filePath)).rejects.toThrow()
+  })
+
+  it('reads a valid handoff file', async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), 'discover-'))
+    const filePath = path.join(dir, 'continuing-candidates.json')
+    await writeFile(filePath, JSON.stringify([baseCandidate]), 'utf-8')
+
+    expect(await readContinuingCandidates(filePath)).toEqual([baseCandidate])
   })
 })
