@@ -499,6 +499,9 @@ importers:
 
   scripts:
     dependencies:
+      '@modernizer/crawler':
+        specifier: workspace:*
+        version: link:../packages/crawler
       '@modernizer/discovery':
         specifier: workspace:*
         version: link:../packages/discovery

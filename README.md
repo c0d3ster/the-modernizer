@@ -122,6 +122,8 @@ final = (static_score × 0.25) + (performance × 0.25) + (seo × 0.25) + (access
 
 PSI runs a full Lighthouse audit per URL, which can take several seconds up to ~60s for a complex page — budget for that when scoring a batch of candidates.
 
+To find and score candidates in bulk, `pnpm --filter @modernizer/scripts discover --city <city> --state <state> --out-dir leads` runs the full pipeline: Google Places search (needs `GOOGLE_PLACES_API_KEY`), filtering, then scoring every candidate with a website. It writes `greenfield-leads.csv`, `continuing-candidates.json`, and `candidates.csv` (sorted by score, lowest first). Add `--from-candidates leads/continuing-candidates.json` to re-score a previous run without repeating the Places search.
+
 Full scoring rubric, signal weights, and rationale: `docs/market-discovery.md`.
 
 ## Development
