@@ -505,6 +505,9 @@ importers:
       '@modernizer/discovery':
         specifier: workspace:*
         version: link:../packages/discovery
+      '@modernizer/schema':
+        specifier: workspace:*
+        version: link:../packages/schema
       commander:
         specifier: ^14.0.3
         version: 14.0.3

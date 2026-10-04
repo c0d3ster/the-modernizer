@@ -29,6 +29,7 @@ import type {
   StalenessSource,
   StaticScoreResult,
 } from '@modernizer/discovery'
+import { CANDIDATE_SCORE_COLUMNS } from '@modernizer/schema'
 import { z } from 'zod'
 
 const PLACES_TEXT_SEARCH_ENDPOINT = 'https://places.googleapis.com/v1/places:searchText'
@@ -562,30 +563,9 @@ export const scoreCandidates = async (
   return { ranked: rankCandidates(scored), unreachable }
 }
 
-// Column order per docs/market-discovery.md "Output Format" > candidates.csv, exactly.
-export const CANDIDATES_CSV_HEADER = [
-  'business_name',
-  'phone',
-  'address',
-  'city',
-  'state',
-  'url',
-  'score',
-  'no_ssl',
-  'no_viewport',
-  'last_changed',
-  'old_jquery',
-  'old_wp_theme',
-  'no_og_tags',
-  'table_layout',
-  'ie_compatible',
-  'static_score',
-  'psi_score',
-  'psi_performance',
-  'psi_seo',
-  'psi_accessibility',
-  'notes',
-] as const
+// Column order per docs/market-discovery.md "Output Format" > candidates.csv, shared with
+// the report and outreach via @modernizer/schema's CandidateScore contract.
+export const CANDIDATES_CSV_HEADER = CANDIDATE_SCORE_COLUMNS
 
 const roundScore = (value: number): number => Math.round(value * 10) / 10
 
