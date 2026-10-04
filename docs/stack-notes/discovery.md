@@ -210,3 +210,50 @@ Branch: overnight/2026-10-04/r2-01-t05-scored-candidates-csv
   on an in-process HTTP server, fake Places responses, stubbed Wayback/PSI). No live run
   was done in this session (no `PSI_API_KEY`/`GOOGLE_PLACES_API_KEY` here), so a live
   scoring run is still worth doing before relying on the output.
+
+## `#6` Modernization report consumes the scored CSV
+
+Branch: overnight/2026-10-04/r2-02-t06-scored-report
+
+### Decisions
+
+- **`CandidateScore` lives in `packages/schema/src/candidate-score.ts`** with keys
+  matching the `candidates.csv` columns exactly (snake_case, same order as
+  `CANDIDATE_SCORE_COLUMNS`), rather than camelCase, so a CSV row maps onto it with no
+  renaming. The Zod schema accepts either CSV strings (`'true'`, `'38.5'`, `''` for
+  unavailable) or already-typed values. Empty PSI and `last_changed` cells become
+  `null`; scores are range-checked 0-100.
+- **`parseCandidatesCsv` added to the schema package** (hand-rolled RFC 4180 subset:
+  quoted cells, `""` escapes, CRLF). Throws on a header mismatch or an invalid row, with
+  the row number. `#7`/`#9` can use it to read `candidates.csv` without another CSV
+  dependency.
+- **Single column list:** `scripts/discover-candidates.ts`'s `CANDIDATES_CSV_HEADER` is
+  now `CANDIDATE_SCORE_COLUMNS` from `@modernizer/schema` (added as a `scripts`
+  dependency), so the writer and the contract can't drift.
+- **`generateReport(schema, nav, candidateScore?)`:** when a score is given, a
+  `## Modernization Score` section renders between `## Source Site` and
+  `## What Changed`, with the overall score and threshold verdict (≤40 / 41-60 / 61+ per
+  the doc), a sub-score table (static, performance, SEO, accessibility at 25% each),
+  the informational PSI composite, a static-signal Yes/No table, staleness, and the
+  row's notes. Without a score the output is byte-identical to before (verified against
+  main's implementation, ignoring the timestamp).
+- **Signal weights are not shown in the report**, only Yes/No, to avoid duplicating
+  `@modernizer/discovery`'s `STATIC_SCORE_WEIGHTS` in `generator-local` (no dependency
+  between them today). `#7` can add them if the shared report moves somewhere that can
+  depend on `discovery`.
+- **Not wired to a CLI flag:** `generateSite` still calls `generateReport(schema, nav)`.
+  Passing a score through the CLI is left to `#7` (which moves `generateReport` into
+  `generator-config` anyway).
+
+### Interfaces / exports created (`@modernizer/schema`)
+
+- `CANDIDATE_SCORE_COLUMNS`, `candidateScoreSchema`, `CandidateScore` type,
+  `parseCandidatesCsv(csv) => CandidateScore[]`.
+
+### Deviations from acceptance criteria
+
+- None. Both acceptance cases are covered in
+  `packages/generator-local/src/report-generator.test.ts` against a hand-written fixture
+  CSV (scored with PSI, static-only without Wayback, and unscored). This is also the
+  first test file for the report generator, so the page table and block-count table are
+  now covered too, ahead of `#7`.
