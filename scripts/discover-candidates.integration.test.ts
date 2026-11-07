@@ -8,9 +8,11 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 
 import {
   CANDIDATES_CSV_HEADER,
+  UNREACHABLE_CSV_HEADER,
   runDiscovery,
   scoreCandidates,
   writeCandidatesCsv,
+  writeUnreachableCsv,
 } from './discover-candidates.js'
 
 // Full pipeline against fabricated fixtures (no live data exists to record): Stage 1 uses a
@@ -133,5 +135,12 @@ describe('discovery pipeline (integration)', () => {
     expect(scores).toEqual([...scores].sort((a, b) => a - b))
     // Every static signal plus capped staleness fires: 100 - (20+20+20+12+10+10+5+3) = 0
     expect(scores[0]).toBe(0)
+
+    const unreachablePath = path.join(outDir, 'unreachable.csv')
+    await writeUnreachableCsv(unreachable, unreachablePath)
+    const unreachableLines = (await readFile(unreachablePath, 'utf-8')).trim().split('\n')
+    expect(unreachableLines[0]).toBe(UNREACHABLE_CSV_HEADER.join(','))
+    expect(unreachableLines).toHaveLength(2)
+    expect(unreachableLines[1]).toContain('thin-salon')
   }, 30000)
 })
