@@ -523,12 +523,12 @@ const mapWithConcurrency = async <T, R>(
   fn: (item: T) => Promise<R>
 ): Promise<R[]> => {
   const results: R[] = []
-  let nextIndex = 0
+  // One shared iterator: each worker pulls the next [index, item] pair, so no index math
+  // or element casts are needed.
+  const queue = items.entries()
 
   const worker = async (): Promise<void> => {
-    while (nextIndex < items.length) {
-      const index = nextIndex++
-      const item = items[index] as T
+    for (const [index, item] of queue) {
       results[index] = await fn(item)
     }
   }
@@ -633,6 +633,43 @@ export const writeCandidatesCsv = async (
   filePath: string
 ): Promise<void> => {
   await writeFile(filePath, candidatesToCsv(candidates), 'utf-8')
+}
+
+// Candidates whose homepage couldn't be fetched get no score, but they are not dropped
+// silently: they are written to unreachable.csv for manual review (a dead or broken site
+// can be an even better modernization prospect than a low-scoring one).
+export const UNREACHABLE_CSV_HEADER = [
+  'business_name',
+  'phone',
+  'address',
+  'city',
+  'state',
+  'url',
+  'review_count',
+  'place_id',
+] as const
+
+export const unreachableToCsv = (candidates: ContinuingCandidate[]): string => {
+  const rows = candidates.map((candidate) =>
+    toCsvRow([
+      candidate.name,
+      candidate.phone,
+      candidate.address,
+      candidate.city,
+      candidate.state,
+      candidate.website,
+      candidate.reviewCount,
+      candidate.placeId,
+    ])
+  )
+  return [toCsvRow([...UNREACHABLE_CSV_HEADER]), ...rows].join('\n') + '\n'
+}
+
+export const writeUnreachableCsv = async (
+  candidates: ContinuingCandidate[],
+  filePath: string
+): Promise<void> => {
+  await writeFile(filePath, unreachableToCsv(candidates), 'utf-8')
 }
 
 // Validates the interim continuing-candidates.json handoff file (written by a previous
