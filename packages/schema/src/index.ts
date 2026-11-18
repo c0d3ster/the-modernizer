@@ -60,3 +60,35 @@ export {
   parseCandidatesCsv,
 } from './candidate-score.js'
 export type { CandidateScore } from './candidate-score.js'
+
+export {
+  COVERAGE_KINDS,
+  PROJECT_FEATURE_LABELS,
+  PROJECT_FEATURE_VALUES,
+  SCREENSHOT_POSITIONS,
+  VIEWPORT_NAMES,
+  coverageItemSchema,
+  coverageNoteSchema,
+  detectedProjectFeatureSchema,
+  pageCtaSchema,
+  pageFeaturesSchema,
+  pageSeoSchema,
+  projectFeatureValueSchema,
+  screenshotSchema,
+  siteInspectionSchema,
+  viewInspectionSchema,
+  viewportNameSchema,
+} from './inspection.js'
+export type {
+  CoverageItem,
+  CoverageKind,
+  CoverageNote,
+  DetectedProjectFeature,
+  PageCta,
+  PageFeatures,
+  ProjectFeatureValue,
+  Screenshot,
+  SiteInspection,
+  ViewInspection,
+  ViewportName,
+} from './inspection.js'
