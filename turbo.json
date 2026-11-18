@@ -3,6 +3,7 @@
   "ui": "tui",
   "globalEnv": [
     "MODERNIZER_HEADLESS",
+    "MODERNIZER_CHROMIUM_PATH",
     "ANTHROPIC_API_KEY",
     "GEMINI_API_KEY",
     "PSI_API_KEY",
