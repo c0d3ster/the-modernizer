@@ -5,6 +5,7 @@ import { pageFeaturesSchema, siteInspectionSchema } from '@modernizer/schema'
 import type { CoverageItem, PageFeatures, Screenshot, SiteInspection, ViewInspection } from '@modernizer/schema'
 import { detectCoverage } from './browser/detect-coverage.js'
 import { detectFeatures } from './browser/detect-features.js'
+import { measureHeaderBands } from './browser/measure-header.js'
 import { dismissConsent, scrollOneScreen, visibleText, warmUp } from './browser/page-actions.js'
 import { coverageNotes, coversDesign } from './coverage.js'
 import { detectProjectFeatures } from './project-features.js'
@@ -54,7 +55,8 @@ const screenshot = async (page: Page, dir: string | undefined, file: string, pos
 
 const readFeatures = async (page: Page): Promise<{ features: PageFeatures | null; error?: string }> => {
   try {
-    const parsed = pageFeaturesSchema.safeParse(await page.evaluate(detectFeatures))
+    const headerBands = await page.evaluate(measureHeaderBands).catch(() => undefined)
+    const parsed = pageFeaturesSchema.safeParse({ ...(await page.evaluate(detectFeatures)), ...(headerBands && { headerBands }) })
     if (parsed.success) return { features: parsed.data }
     return { features: null, error: `feature detection returned an unexpected shape: ${parsed.error.issues[0]?.path.join('.') ?? ''}` }
   } catch (err) {
