@@ -6,6 +6,10 @@ const PATTERNS: readonly (readonly [Exclude<VerticalId, 'general'>, RegExp])[] =
   ['dental', /\b(dent(al|ist|istry|ures?)|orthodont\w*|endodont\w*|periodont\w*|oral (and|&) (maxillo)?facial|oral surgery|braces|invisalign|implants?|dds|dmd|hygien\w*|smiles?|teeth|tooth|crowns?|root canals?)\b/gi],
   ['home-services', /\b(plumb\w*|hvac|heating|cooling|air condition\w*|heat pumps?|air quality|furnaces?|water heaters?|drains?|sewer|rooter|handyman|electric(al|ian)|roofing|gutters?|remodel\w*|contractors?|septic|duct\w*|comfort|generators?|residential|emergency service)\b/gi],
   ['cafe', /\b(caf[eé]|coffee|espresso|latte|roast(ed|ery|ers?)|bakery|pastr(y|ies)|bagels?|donuts?)\b/gi],
+  ['auto-services', /\b(auto ?body|collision|body shop|auto repair|car repair|mechanics?|brakes?|tires?|oil changes?|transmissions?|alignments?|paintless|frame straighten\w*|hail damage|vehicles?|automotive|i-car)\b/gi],
+  ['chiropractic', /\b(chiropract\w*|spinal|spine|adjustments?|back pain|neck pain|sciatica|physical therap\w*|wellness|massage therap\w*|decompression|posture|sports injur\w*)\b/gi],
+  ['legal', /\b(attorneys?|lawyers?|law (firm|office|group)|legal|personal injury|injur(y|ies|ed)|accidents?|wrongful death|litigation|esq\.?|verdicts?|settlements?|consultation|practice areas?)\b/gi],
+  ['veterinary', /\b(veterinar\w*|vets?|animal (hospital|clinic)|pets?|dogs?|puppies|cats?|kittens?|canine|feline|spay\w*|neuter\w*|grooming|boarding)\b/gi],
   ['restaurant', /\b(restaurants?|bistro|grill|kitchen|trattoria|cucina|pizzeria|pizza|sushi|tapas|tavern|brew(ery|pub)|beer|taproom|wine|cocktails?|bar|lounge|bites|sips|steakhouse|diner|deli|eatery|dinner|lunch|brunch|entrees?|appetizers?|menu|reservations?|dine in|takeout|catering|chicken|wings|burgers?|fusion|happy hour|food)\b/gi],
 ]
 
@@ -14,6 +18,10 @@ const BUSINESS_TYPES: readonly (readonly [RegExp, VerticalId])[] = [
   [/dentist|dental|orthodont|endodont|periodont|oral surgeon/i, 'dental'],
   [/plumb|hvac|heating|air condition|electric|handyman|roof|contractor/i, 'home-services'],
   [/cafe|coffee|bakery/i, 'cafe'],
+  [/auto|collision|body shop|mechanic|tire|car repair/i, 'auto-services'],
+  [/chiropract|physical therap|wellness/i, 'chiropractic'],
+  [/attorney|lawyer|law firm|legal/i, 'legal'],
+  [/veterinar|\bvet\b|animal hospital|\bpets?\b/i, 'veterinary'],
   [/restaurant|\bbar\b|grill|pizza|food/i, 'restaurant'],
 ]
 
