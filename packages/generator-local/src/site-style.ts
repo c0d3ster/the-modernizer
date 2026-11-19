@@ -23,6 +23,8 @@ const ACTION_PATHS: Readonly<Record<PrimaryActionKind, readonly RegExp[]>> = {
   schedule: [/schedul|book|service-request/, /request|estimate|quote/, /contact/],
   reserve: [/reserv|booking/, /contact|visit/],
   order: [/order/, /menu/],
+  estimate: [/estimate|quote/, /appointment|schedul/, /contact/],
+  consult: [/consult|case-review|evaluation/, /contact/],
   call: [/contact/],
   contact: [/contact/],
 }

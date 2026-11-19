@@ -23,6 +23,13 @@ describe('detectVertical', () => {
     expect(detectVertical(site('Doppio Bunny Coffee', ['Locations', 'Order Online']))).toBe('cafe')
   })
 
+  it('reads the business types discovery searches beyond the bench', () => {
+    expect(detectVertical(site('Valley Collision Center', ['Collision Repair', 'Paint', 'Insurance Claims']))).toBe('auto-services')
+    expect(detectVertical(site('Shenandoah Chiropractic', ['Back Pain', 'Sports Injuries', 'New Patients']))).toBe('chiropractic')
+    expect(detectVertical(site('Smith Injury Lawyers', ['Car Accidents', 'Practice Areas', 'Free Consultation']))).toBe('legal')
+    expect(detectVertical(site('Westside Animal Hospital', ['Dogs', 'Cats', 'Boarding']))).toBe('veterinary')
+  })
+
   it('falls back to general when nothing points to a vertical', () => {
     expect(detectVertical(site('Edgehill Recovery', ['About', 'Programs', 'Contact']))).toBe('general')
   })
@@ -38,7 +45,11 @@ describe('verticalFromBusinessType', () => {
     expect(verticalFromBusinessType('hvac contractor')).toBe('home-services')
     expect(verticalFromBusinessType('dentist')).toBe('dental')
     expect(verticalFromBusinessType('restaurant')).toBe('restaurant')
-    expect(verticalFromBusinessType('auto body shop')).toBe('general')
+    expect(verticalFromBusinessType('auto body shop')).toBe('auto-services')
+    expect(verticalFromBusinessType('chiropractor')).toBe('chiropractic')
+    expect(verticalFromBusinessType('personal injury attorney')).toBe('legal')
+    expect(verticalFromBusinessType('veterinarian')).toBe('veterinary')
+    expect(verticalFromBusinessType('carpet store')).toBe('general')
   })
 })
 
