@@ -37,6 +37,15 @@ describe('vertical design direction in the Claude prompts', () => {
     expect(cached).toContain('Home services')
   })
 
+  it('forbids invented facts and takes the phone from a contact block when the footer has none', () => {
+    const contactPage = { url: 'https://example.com/contact', title: 'Contact', archetype: PageArchetype.Contact, blocks: [{ type: 'contact_info' as const, phone: '540-667-8287' }] }
+    const schema = site({ siteName: 'Amos Family Dentistry', footer: undefined, pages: [...site({}).pages, contactPage] })
+    const { cached, task } = buildShellPrompt(schema)
+    expect(cached).toContain('never use placeholder numbers like 555')
+    expect(cached).toContain('- Phone: 540-667-8287')
+    expect(task).toContain('540-667-8287 as a tap-to-call')
+  })
+
   it('shares one cached context between the shell and every page', () => {
     const schema = site({ siteName: 'J Hood Plumbing and Heating' })
     const page = schema.pages[0]

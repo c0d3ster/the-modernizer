@@ -49,7 +49,8 @@ Generate exactly one file: ${filePath} — the default-exported page component f
 ## Quality Bar
 - Follow the Design System section above exactly — same container/padding, section spacing, card style, heading scale, button conventions, and hero treatment as every other page. Do not invent your own variant of any of these; this page must look like it was built by the same person as the rest of the site
 - Use the brand colors meaningfully throughout — hero backgrounds, buttons, accents
-- Real content from the blocks above — no placeholders, no Lorem Ipsum
+- Real content from the blocks above — no placeholders, no Lorem Ipsum, and no facts that are not in the content (see Facts above)
+- Every button must stay readable on its background: an outline or secondary button over a photo or dark section needs light text and a light border on a transparent background, never light text on a light fill
 - Semantic HTML, accessible (aria labels, alt text)
 - Generous whitespace, strong visual hierarchy
 

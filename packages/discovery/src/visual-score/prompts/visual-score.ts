@@ -52,7 +52,9 @@ HOW TO WORK
 `.trim()
 
 /** The text that follows the screenshots: what each image is and what the browser measured. */
-export const visualScoreUserText = (facts: string): string => `
+export const visualScoreUserText = (facts: string, today: Date = new Date()): string => `
+Today is ${today.toISOString().slice(0, 10)}.
+
 Measured facts about this page:
 ${facts}
 

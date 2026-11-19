@@ -31,7 +31,7 @@ ${profile.character}
 - Main action everywhere: "${primaryAction.label}"${profile.headerPhone ? ', with the phone number as a tap-to-call button in the header' : ''}. One header bar, sticky, full width.
 - Home page, in this order:
 ${profile.homeSections.map((s, i) => `  ${i + 1}. ${s}`).join('\n')}
-- Trust signals to surface where the content has them:
+- Trust signals to surface, only where the content states them (never invent a rating, count or year):
 ${profile.trustSignals.map((s) => `  - ${s}`).join('\n')}
 
 ### What the best sites in this vertical do
