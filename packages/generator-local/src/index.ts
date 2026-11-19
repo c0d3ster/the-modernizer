@@ -8,7 +8,7 @@ import { generatePage } from './page-generator.js'
 import { generateLayout, generateGlobalsCss, buildNav, navSource } from './layout-generator.js'
 import { generateReport } from './report-generator.js'
 import { placeBlocks } from './block-placer.js'
-import { synthesizeHero, synthesizePageHeaders } from './hero-synthesizer.js'
+import { synthesizeGallery, synthesizeHero, synthesizePageHeaders } from './hero-synthesizer.js'
 import { resolveSiteStyle } from './site-style.js'
 import {
   generatePackageJson,
@@ -43,6 +43,7 @@ export const generateSite = async (schema: SiteSchema, outputDir: string): Promi
   const style = resolveSiteStyle(placedSchema)
   schema = synthesizeHero(placedSchema, style.primaryAction)
   schema = synthesizePageHeaders(schema)
+  schema = synthesizeGallery(schema)
 
   // 1. Copy component library (shadcn primitives, blocks, layout, lib, styles, schema types)
   await copyComponents(outputDir)

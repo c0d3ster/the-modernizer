@@ -10,6 +10,8 @@ import { Menu, X, ChevronDown, Phone } from 'lucide-react'
 
 interface NavbarProps {
   siteName: string
+  // The business's own logo; shown small in place of the name (the name stays for screen readers)
+  logoUrl?: string
   nav: NavItem[]
   ctaText?: string
   ctaUrl?: string
@@ -92,7 +94,7 @@ const MobileNavItem = ({ item, onClose }: { item: NavItem; onClose: () => void }
   )
 }
 
-export const Navbar = ({ siteName, nav, ctaText, ctaUrl, phone, maxVisible = 6 }: NavbarProps): React.ReactElement => {
+export const Navbar = ({ siteName, logoUrl, nav, ctaText, ctaUrl, phone, maxVisible = 6 }: NavbarProps): React.ReactElement => {
   const [open, setOpen] = React.useState(false)
   const visible = nav.length > maxVisible ? nav.slice(0, maxVisible - 1) : nav
   const overflow = nav.length > maxVisible ? nav.slice(maxVisible - 1) : []
@@ -104,9 +106,16 @@ export const Navbar = ({ siteName, nav, ctaText, ctaUrl, phone, maxVisible = 6 }
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/85">
       <div className={cn(container, 'flex h-16 items-center justify-between gap-6 lg:h-20')}>
-        <Link href="/" className="min-w-0 truncate font-heading text-lg font-bold tracking-tight text-foreground lg:max-w-[16rem] lg:text-xl xl:max-w-none">
-          {siteName}
-        </Link>
+        {logoUrl ? (
+          <Link href="/" className="flex shrink-0 items-center">
+            <img src={logoUrl} alt="" className="h-9 w-auto max-w-[11rem] object-contain lg:h-11 lg:max-w-[14rem]" />
+            <span className="sr-only">{siteName}</span>
+          </Link>
+        ) : (
+          <Link href="/" className="min-w-0 truncate font-heading text-lg font-bold tracking-tight text-foreground lg:max-w-[16rem] lg:text-xl xl:max-w-none">
+            {siteName}
+          </Link>
+        )}
 
         <nav className="hidden items-center gap-5 lg:flex xl:gap-7" aria-label="Main">
           {visible.map((item) => (

@@ -155,6 +155,7 @@ export const generateLayout = (schema: SiteSchema, style?: SiteStyle): string =>
   // The vertical's fonts, main action and header phone; without a style, the plain shell
   const fonts = style ? fontSetup(style.profile) : null
   const navProps: string[] = []
+  if (schema.logoUrl) navProps.push(`logoUrl={${JSON.stringify(schema.logoUrl)}}`)
   if (style?.primaryAction) navProps.push(`ctaText={${JSON.stringify(style.primaryAction.text)}}`, `ctaUrl={${JSON.stringify(style.primaryAction.url)}}`)
   if (style?.headerPhone) navProps.push(`phone={${JSON.stringify(style.headerPhone)}}`)
   const navPropsStr = navProps.length > 0 ? ` ${navProps.join(' ')}` : ''
