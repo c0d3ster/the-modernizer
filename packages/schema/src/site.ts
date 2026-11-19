@@ -33,6 +33,22 @@ export interface SiteGeneratorPreferences {
   noHero?: boolean
 }
 
+/** What an image on the original site is: the logo, a small icon or graphic, or a content photo. */
+export type SiteImageKind = 'logo' | 'icon' | 'photo'
+
+/** One image found on the original site, so generators can reuse real photos and the logo. */
+export interface SiteImage {
+  url: string
+  alt?: string
+  // Intrinsic or rendered size when the page or URL states it
+  width?: number
+  height?: number
+  kind: SiteImageKind
+  pageUrl: string
+  // Order on its page, from the top
+  order: number
+}
+
 export interface SiteSchema {
   rootUrl: string
   siteName: string
@@ -40,6 +56,10 @@ export interface SiteSchema {
   brandColors: BrandColors
   faviconUrl?: string
   logoUrl?: string
+  /** Photo picked for the home hero from the site's own images. */
+  heroImageUrl?: string
+  /** Images found across the crawled pages, logo and icons included, deduplicated. */
+  images?: SiteImage[]
   nav: NavItem[]
   pages: PageSchema[]
   /** Site-wide footer contact block; drives `Footer` props in generated layout. */

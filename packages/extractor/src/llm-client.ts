@@ -39,7 +39,8 @@ export interface LlmTool {
   input_schema: { type: 'object'; properties?: Record<string, unknown>; required?: string[]; [key: string]: unknown }
 }
 
-export const callLlmWithTool = async <T>(prompt: string, tool: LlmTool): Promise<T> => {
+// Text, or text and images (e.g. hero candidates) as content blocks
+export const callLlmWithTool = async <T>(prompt: string | Anthropic.ContentBlockParam[], tool: LlmTool): Promise<T> => {
   const response = await getClient().messages.create({
     model: MODEL,
     max_tokens: 8192,

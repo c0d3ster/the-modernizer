@@ -23,6 +23,8 @@ export type {
   NavItem,
   BrandColors,
   SiteFooterInfo,
+  SiteImage,
+  SiteImageKind,
   SiteGeneratorPreferences,
   SiteSchema,
 } from './site.js'
@@ -50,6 +52,7 @@ export {
   brandColorsSchema,
   navItemSchema,
   siteFooterInfoSchema,
+  siteImageSchema,
   siteGeneratorPreferencesSchema,
   siteSchemaSchema,
 } from './validation.js'
@@ -71,6 +74,7 @@ export {
   coverageNoteSchema,
   detectedProjectFeatureSchema,
   pageCtaSchema,
+  headerBandSchema,
   pageFeaturesSchema,
   pageSeoSchema,
   projectFeatureValueSchema,
@@ -84,6 +88,7 @@ export type {
   CoverageKind,
   CoverageNote,
   DetectedProjectFeature,
+  HeaderBand,
   PageCta,
   PageFeatures,
   ProjectFeatureValue,

@@ -124,13 +124,20 @@ const collectBlocks = ($: cheerio.CheerioAPI, root: ReturnType<cheerio.CheerioAP
       // Check whether this div is itself a multi-section container (e.g. a
       // widget column or page-builder row). If it has multiple substantial
       // child divs, recurse rather than treating it as one opaque block.
-      const substantialChildren = $(el).children('div').filter((_, child) =>
-        hasSubstantialText($.html(child) ?? '')
-      )
+      // Page builders (Brizy, Wix, Elementor) nest each section in several single-child wrappers,
+      // so look through those before deciding.
+      const substantialDivs = (node: ReturnType<cheerio.CheerioAPI>): ReturnType<cheerio.CheerioAPI> =>
+        node.children('div, section, article').filter((_, child) => hasSubstantialText($.html(child) ?? ''))
+      let container: ReturnType<cheerio.CheerioAPI> = $(el)
+      let substantialChildren = substantialDivs(container)
+      for (let depth = 0; substantialChildren.length === 1 && depth < 8; depth++) {
+        container = substantialChildren.first()
+        substantialChildren = substantialDivs(container)
+      }
 
       if (substantialChildren.length >= 2) {
         flushCurrent()
-        collectBlocks($, $(el), blocks)
+        collectBlocks($, container, blocks)
       } else {
         flushCurrent()
         blocks.push({ html: elHtml })
@@ -147,6 +154,8 @@ export const splitBlocks = (contentHtml: string): RawBlock[] => {
   const $ = cheerio.load(contentHtml)
 
   stripResidualChrome($)
+  // Inline styles and scripts are text to cheerio and would pass as content
+  $('style, script, noscript, template').remove()
 
   const root = getContentRoot($)
   const blocks: RawBlock[] = []

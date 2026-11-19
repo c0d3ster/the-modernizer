@@ -2,12 +2,15 @@
 
 export { crawl } from './crawler.js'
 export { resolvePlaywrightHeadless } from './playwright-fetcher.js'
+export { sampleRenderedColors } from './rendered-colors.js'
+export type { ColorSample } from './rendered-colors.js'
 export { staticFetch } from './static-fetcher.js'
 export type { StaticFetchResult } from './static-fetcher.js'
 export {
   normalizeUrl,
   isSameDomain,
   isAssetUrl,
+  isInfrastructureUrl,
   isNavigableUrl,
   deduplicateUrls,
   unwrapWaybackUrl,

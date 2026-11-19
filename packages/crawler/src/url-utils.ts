@@ -53,6 +53,20 @@ export const isAssetUrl = (url: string): boolean => {
   }
 }
 
+// Platform and plugin paths that are never content pages: CDN helpers, WordPress internals and
+// API endpoints, feeds. Crawling them spends the page budget on junk (seen on a real site:
+// /cdn-cgi/l/email-protection). wp-content stays crawlable: files there are caught as assets, and
+// plugin pages can be real content (a restaurant menu plugin serves its menu from one).
+const INFRASTRUCTURE_PATH = /^\/(cdn-cgi|wp-includes|wp-admin|wp-json|xmlrpc\.php|wp-login\.php)(\/|$)|\/(feed|amp)\/?$/i
+
+export const isInfrastructureUrl = (url: string): boolean => {
+  try {
+    return INFRASTRUCTURE_PATH.test(new URL(unwrapWaybackUrl(url)).pathname)
+  } catch {
+    return false
+  }
+}
+
 export const isNavigableUrl = (url: string, rootUrl: string): boolean => {
   if (!url || url.startsWith('javascript:') || url.startsWith('mailto:') || url.startsWith('tel:')) {
     return false
@@ -60,6 +74,7 @@ export const isNavigableUrl = (url: string, rootUrl: string): boolean => {
   if (url.startsWith('#')) return false
   if (!isSameDomain(url, rootUrl)) return false
   if (isAssetUrl(url)) return false
+  if (isInfrastructureUrl(url)) return false
   return true
 }
 

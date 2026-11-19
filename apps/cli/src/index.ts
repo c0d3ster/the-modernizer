@@ -5,7 +5,7 @@ config({ path: resolvePath(process.cwd(), '.env') })
 import { writeFile, mkdir, readFile } from 'node:fs/promises'
 import { resolve, join } from 'node:path'
 import { Command } from 'commander'
-import { crawl } from '@modernizer/crawler'
+import { crawl, sampleRenderedColors } from '@modernizer/crawler'
 import { extract, getUsageStats } from '@modernizer/extractor'
 import { generateSite } from '@modernizer/generator-local'
 import { VERTICAL_IDS, siteSchemaSchema, verticalIdSchema } from '@modernizer/schema'
@@ -123,7 +123,9 @@ program.action(async (url: string | undefined, opts: {
 
     // ── Stage 2: extract ───────────────────────────────────────────────────
     log(`Extracting content...`)
-    let schema = await extract(pages)
+    const renderedColors = await sampleRenderedColors(pages[0]?.finalUrl ?? url)
+    debug(`  Rendered colors: ${renderedColors.map((c) => c.hex).join(', ') || 'none'}`)
+    let schema = await extract(pages, { renderedColors })
     const stats = getUsageStats()
     log(`  Extracted ${schema.pages.length} pages — ${stats.calls} LLM calls, ${stats.inputTokens + stats.outputTokens} tokens, ~$${stats.estimatedCostUsd.toFixed(4)}`)
 
