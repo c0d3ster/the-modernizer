@@ -55,3 +55,4 @@ export {
   visualScoreInputFromInspection,
 } from './visual-score/visual-score.js'
 export type { LabeledImage, VisualScoreInput, VisualScoreModel, VisualScoreOptions, VisualScoreResult } from './visual-score/visual-score.js'
+export { remeasureLaptop } from './inspect/remeasure.js'

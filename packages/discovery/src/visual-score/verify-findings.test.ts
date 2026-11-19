@@ -57,3 +57,11 @@ describe('buildVerifyRequest', () => {
     expect(Array.isArray(last?.content) && last.content[0]).toMatchObject({ type: 'tool_result', tool_use_id: 'toolu_1' })
   })
 })
+
+describe('parseVisualScore with a measured sticky header', () => {
+  it('drops header-not-sticky when the header stays pinned', () => {
+    const toolInput = { unassessable: false, overall: 5, pitch: 'no', issues: [], findings: [finding('header-not-sticky')], strengths: [], cantJudge: [], note: 'ok' }
+    expect(parseVisualScore(toolInput, { headerSticks: true }).points).toBe(100)
+    expect(parseVisualScore(toolInput, { headerSticks: false }).points).toBeLessThan(100)
+  })
+})
