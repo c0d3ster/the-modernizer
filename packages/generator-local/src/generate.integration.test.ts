@@ -177,6 +177,23 @@ describe('generateSite', () => {
       expect(layout).not.toContain('https://example-bakery.com')
     })
 
+    it('styles the shell for the business type (a bakery reads as a cafe)', async () => {
+      const layout = await read('src/app/layout.tsx')
+      expect(layout).toContain("import { Nunito, DM_Sans } from 'next/font/google'")
+      expect(layout).toContain("variable: '--font-display'")
+      expect(layout).toContain('className={`${displayFont.variable} ${bodyFont.variable}`}')
+      // A cafe's main action is ordering; this site has no order page, so it falls back to calling
+      expect(layout).toContain('ctaText={"Call now"} ctaUrl={"tel:+15550123456"}')
+      const css = await read('src/app/globals.css')
+      expect(css).toContain('--radius-button: 9999px;')
+      expect(css).toContain('--color-muted: #efe6d8;')
+    })
+
+    it('renders the home hero in the vertical style', async () => {
+      const page = await read('src/app/page.tsx')
+      expect(page).toMatch(/<HeroBlock block=\{[\s\S]*?\} variant='overlay' \/>/)
+    })
+
     it('imports Navbar and Footer', async () => {
       const layout = await read('src/app/layout.tsx')
       expect(layout).toContain("from '@/components/layout/Navbar'")

@@ -8,7 +8,9 @@ import { Command } from 'commander'
 import { crawl } from '@modernizer/crawler'
 import { extract, getUsageStats } from '@modernizer/extractor'
 import { generateSite } from '@modernizer/generator-local'
-import { siteSchemaSchema } from '@modernizer/schema'
+import { VERTICAL_IDS, siteSchemaSchema, verticalIdSchema } from '@modernizer/schema'
+import type { SiteSchema } from '@modernizer/schema'
+import { verticalFromBusinessType, verticalOf } from '@modernizer/design-guide'
 import { generateLovable } from '@modernizer/generator-lovable'
 import { generateWithClaude } from '@modernizer/generator-claude'
 
@@ -28,6 +30,7 @@ program
   .option('--schema-only', 'stop after extraction and write schema.json (no generation)', false)
   .option('--from-schema <file>', 'skip crawl/extract and load from a saved schema JSON')
   .option('--primary-color <hex>', 'override auto-detected brand color (e.g. #2563eb)')
+  .option('--vertical <type>', `business type for the design profile: ${VERTICAL_IDS.join(', ')}, or a discovery business type like "plumber" (detected when omitted)`)
   .option('--lovable', 'generate via Lovable browser (default when no generator flag is set)', false)
   .option('--claude', 'generate via Claude API (requires ANTHROPIC_API_KEY in .env)', false)
   .option('--local', 'generate a local Next.js project using the deterministic template generator', false)
@@ -37,6 +40,13 @@ program
     'use headless Chromium for Playwright fallback (CI, Docker); default is headful. Env MODERNIZER_HEADLESS=true also enables headless',
   )
 
+/** Sets the design profile: the --vertical flag (an id or a discovery business type), else the saved or detected one. */
+const withVertical = (schema: SiteSchema, flag: string | undefined): SiteSchema => {
+  if (!flag) return { ...schema, vertical: verticalOf(schema) }
+  const id = verticalIdSchema.safeParse(flag)
+  return { ...schema, vertical: id.success ? id.data : verticalFromBusinessType(flag) }
+}
+
 program.action(async (url: string | undefined, opts: {
   output?: string
   maxPages: string
@@ -44,6 +54,7 @@ program.action(async (url: string | undefined, opts: {
   schemaOnly: boolean
   fromSchema?: string
   primaryColor?: string
+  vertical?: string
   lovable: boolean
   claude: boolean
   local: boolean
@@ -65,6 +76,8 @@ program.action(async (url: string | undefined, opts: {
       if (opts.primaryColor) {
         schema = { ...schema, brandColors: { ...schema.brandColors, primary: opts.primaryColor } }
       }
+      schema = withVertical(schema, opts.vertical)
+      log(`  Design profile: ${schema.vertical}`)
 
       if (opts.local) {
         const outDir = resolve(opts.output ?? join('.generated', slugify(schema.siteName)))
@@ -117,6 +130,8 @@ program.action(async (url: string | undefined, opts: {
     if (opts.primaryColor) {
       schema = { ...schema, brandColors: { ...schema.brandColors, primary: opts.primaryColor } }
     }
+    schema = withVertical(schema, opts.vertical)
+    log(`  Design profile: ${schema.vertical}`)
 
     const outDir = resolve(opts.output ?? join('.generated', slugify(schema.siteName)))
     await mkdir(outDir, { recursive: true })

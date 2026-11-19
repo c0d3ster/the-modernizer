@@ -9,6 +9,7 @@ import { generateLayout, generateGlobalsCss, buildNav } from './layout-generator
 import { generateReport } from './report-generator.js'
 import { placeBlocks } from './block-placer.js'
 import { synthesizeHero, synthesizePageHeaders } from './hero-synthesizer.js'
+import { resolveSiteStyle } from './site-style.js'
 import {
   generatePackageJson,
   generateNextConfig,
@@ -38,7 +39,9 @@ const copySampleAssetsToPublic = async (outputDir: string): Promise<void> => {
 export const generateSite = async (schema: SiteSchema, outputDir: string): Promise<void> => {
   // 0. Apply intelligent block placement rules (contact info → footer, etc.)
   const { schema: placedSchema } = placeBlocks(schema)
-  schema = synthesizeHero(placedSchema)
+  // The business's vertical decides fonts, neutrals, hero style and the main action
+  const style = resolveSiteStyle(placedSchema)
+  schema = synthesizeHero(placedSchema, style.primaryAction)
   schema = synthesizePageHeaders(schema)
 
   // 1. Copy component library (shadcn primitives, blocks, layout, lib, styles, schema types)
@@ -72,8 +75,8 @@ export const generateSite = async (schema: SiteSchema, outputDir: string): Promi
   // 3. App directory: layout + global styles
   await mkdir(join(outputDir, 'src/app'), { recursive: true })
   await Promise.all([
-    writeFile(join(outputDir, 'src/app/globals.css'), generateGlobalsCss(schema.brandColors)),
-    writeFile(join(outputDir, 'src/app/layout.tsx'), generateLayout(schema)),
+    writeFile(join(outputDir, 'src/app/globals.css'), generateGlobalsCss(schema.brandColors, style.profile.theme)),
+    writeFile(join(outputDir, 'src/app/layout.tsx'), generateLayout(schema, style)),
   ])
 
   // 4. One page file per PageSchema
@@ -83,7 +86,7 @@ export const generateSite = async (schema: SiteSchema, outputDir: string): Promi
       const componentName = urlToComponentName(page.url, base)
       const pageDir = join(outputDir, dirname(routePath))
       await mkdir(pageDir, { recursive: true })
-      await writeFile(join(outputDir, routePath), generatePage(page, componentName))
+      await writeFile(join(outputDir, routePath), generatePage(page, componentName, { variant: style.profile.hero.variant, secondaryCta: style.callAction ?? undefined }))
     })
   )
 }

@@ -1,4 +1,6 @@
 import type { SiteSchema } from '@modernizer/schema'
+import { profileFor, verticalOf } from '@modernizer/design-guide'
+import type { VerticalProfile } from '@modernizer/design-guide'
 import type { PromptParts } from '../llm-client.js'
 import { DESIGN_SYSTEM_FILE_PATH } from '../design-system.js'
 import { buildSiteContextBlock } from './shared.js'
@@ -11,14 +13,25 @@ import { buildSiteContextBlock } from './shared.js'
  * This call decides those conventions once and writes them to DESIGN_SYSTEM_FILE_PATH, which
  * index.ts extracts (see design-system.ts) and threads into every page prompt.
  */
-export const buildShellPrompt = (schema: SiteSchema): PromptParts => ({
+const fontInstructions = ({ theme: { headingFont, bodyFont } }: VerticalProfile): string =>
+  headingFont.importName === bodyFont.importName
+    ? `\`${bodyFont.importName}\` twice, once with \`variable: '--font-body'\` and once with \`variable: '--font-display'\``
+    : `\`${headingFont.importName}\` with \`variable: '--font-display'\` and \`${bodyFont.importName}\` with \`variable: '--font-body'\``
+
+const headerInstructions = (profile: VerticalProfile, phone: string | undefined): string =>
+  `One sticky, full-width header bar (never a second utility bar above it). At most 6 top-level links visible on laptop screens; put the rest in a "More" dropdown so the menu never wraps to a second line. Show the links from the lg breakpoint up and a menu button below it. Include the main action button "${profile.primaryAction.label}", linked to the page that fulfils it (or the contact page)` +
+  (profile.headerPhone && phone ? `, and the phone number ${phone} as a tap-to-call (\`tel:\`) button; on phones, show a call icon button beside the menu button.` : '.')
+
+export const buildShellPrompt = (schema: SiteSchema): PromptParts => {
+  const profile = profileFor(verticalOf(schema))
+  return {
   cached: buildSiteContextBlock(schema),
   task: `You are building the shared shell (root layout, navbar, footer) for this site, and defining the visual design system every other page will be required to follow exactly.
 
 ## Required Files
 Generate exactly these four outputs:
-- src/app/layout.tsx — root layout rendering <Navbar /> and <Footer /> around {children}, imports './globals.css', sets \`metadata\` (title: site name, description: tagline or site name)
-- src/components/layout/Navbar.tsx — sticky/fixed navbar. It must stay fully visible at all times, including on page load before any scroll or hover — do NOT hide, fade, or rely on a hover/focus state to reveal the nav links or their container; a subtle shadow appearing on scroll is fine, but the links themselves are always visible. Use the Navigation above (already local route paths — use \`next/link\`), with a mobile menu.
+- src/app/layout.tsx — root layout rendering <Navbar /> and <Footer /> around {children}, imports './globals.css', sets \`metadata\` (title: site name, description: tagline or site name). Load the fonts with next/font/google: ${fontInstructions(profile)} (subsets ['latin'], display 'swap'), and put both \`.variable\` classes on <html>.
+- src/components/layout/Navbar.tsx — ${headerInstructions(profile, schema.footer?.phone)} It must stay fully visible at all times, including on page load before any scroll or hover — do NOT hide, fade, or rely on a hover/focus state to reveal the nav links or their container; a subtle shadow appearing on scroll is fine, but the links themselves are always visible. Use the Navigation above (already local route paths — use \`next/link\`), with a mobile menu.
   If any nav item has children (a dropdown submenu), the trigger and its dropdown panel must share one continuous hoverable region with NO gap between them — do not offset the panel from the trigger with an outer margin (e.g. \`mt-2\` on the panel itself), since that creates a dead zone the cursor crosses while covering nothing, firing \`onMouseLeave\` and closing the menu before the user reaches the submenu items. Instead keep the panel flush against the trigger (\`top-full\`, no margin) and add any visual spacing as padding *inside* the panel (e.g. \`pt-2\` on its inner content), so the hoverable hit-box has zero gap.
 - src/components/layout/Footer.tsx — footer using the site info and contact details above
 - ${DESIGN_SYSTEM_FILE_PATH} — NOT part of the Next.js app (do not import it from anywhere, do not use App Router file conventions for it) — a single JSON object (no markdown, no code fences, no prose outside the object) recording the exact visual conventions you used above, as literal Tailwind utility class strings a different engineer could copy verbatim into unrelated files and get a matching look. It must have exactly this shape, every key required:
@@ -53,4 +66,5 @@ Generate exactly these four outputs:
 Do NOT generate any page.tsx files — those are generated separately, in their own requests, and will be told to follow the design system above exactly.
 
 Call write_files with these four outputs.`,
-})
+  }
+}

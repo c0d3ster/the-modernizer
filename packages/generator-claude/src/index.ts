@@ -16,6 +16,7 @@ import { buildShellPrompt } from './prompts/shell-prompt.js'
 import { buildPagePrompt } from './prompts/page-prompt.js'
 import { fillMissingHeroImages } from './hero-image.js'
 import { extractDesignSystemSpec } from './design-system.js'
+import { profileFor, verticalOf } from '@modernizer/design-guide'
 
 const PAGE_CONCURRENCY = 4
 
@@ -71,7 +72,7 @@ export const generateWithClaude = async (siteSchema: SiteSchema, outDir: string,
     { path: 'next.config.ts', content: generateNextConfig(collectImageHostnames(schema)) },
     { path: 'tsconfig.json', content: generateTsConfig() },
     { path: 'postcss.config.mjs', content: generatePostcss() },
-    { path: 'src/app/globals.css', content: generateGlobalsCss(schema.brandColors) },
+    { path: 'src/app/globals.css', content: generateGlobalsCss(schema.brandColors, profileFor(verticalOf(schema)).theme) },
     ...deterministicComponents,
     // docs/ is where every human-facing artifact of the modernization effort lands (design
     // system today; the modernization report will join it once that exists) — not under src/
