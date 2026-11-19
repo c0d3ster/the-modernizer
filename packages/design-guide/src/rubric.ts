@@ -12,7 +12,7 @@
 // A fixed rule takes `points` in full, or `partial` when the problem is only partly there. A counted
 // rule takes `points` per unit, up to `max`.
 
-export const RUBRIC_VERSION = 'v3'
+export const RUBRIC_VERSION = 'v4'
 
 export const RULE_AREAS = ['header', 'navigation', 'first-screen', 'overlays', 'typography', 'color', 'imagery', 'mobile', 'cta', 'consistency'] as const
 export type RuleArea = (typeof RULE_AREAS)[number]
@@ -47,7 +47,7 @@ export const DESIGN_RULES: readonly DesignRule[] = [
     id: 'dated-overall',
     area: 'consistency',
     scoring: fixed(15, 8),
-    rule: 'The site as a whole reads as an older template (roughly 2010-2016): stock theme layout, bevels, drop shadows or busy textures, cramped spacing, weak hierarchy, dated fonts together. Partial when it is mostly current with a few dated pieces. Judge the overall impression; the specific problems below are charged separately.',
+    rule: 'The site as a whole reads as an older template (roughly 2010-2016). Charge it only when at least three dated signals show together: bevels, glossy buttons or heavy drop shadows; busy textures or patterned backgrounds; cramped spacing and weak hierarchy; dated or novelty fonts; clip-art or stock icons; a boxed, narrow layout. Bold color blocking, a strong brand palette or a common template structure are design choices, not signs of age. Partial when exactly two signals show. The specific problems below are charged separately.',
   },
   {
     kind: 'avoid',
@@ -62,7 +62,7 @@ export const DESIGN_RULES: readonly DesignRule[] = [
     id: 'header-bars',
     area: 'header',
     scoring: { type: 'per-unit', unit: 'costly extra header bar', points: 5, max: 15 },
-    rule: 'Header bars stacked above the page (utility bar, logo bar, menu bar, promo banner). Count the costly extra bars: a second bar costs nothing when it holds links found nowhere else up front (forms, payments, referrals, social links), ideally hiding on scroll, and counts as 1 when it repeats what the main header shows (the same phone, address or button). A third bar counts 2 in total and a fourth counts 3, whatever they hold.',
+    rule: 'Header bars stacked above the page (utility bar, logo bar, menu bar, promo banner). The logo row and the menu row together make up the main header, even when the logo row also carries contact details. Count the costly extra bars: a second bar costs nothing when it holds links found nowhere else up front (forms, payments, referrals, social links), ideally hiding on scroll, and counts as 1 when it repeats what the main header shows (the same phone, address or button). A third bar counts 2 in total and a fourth counts 3, whatever they hold.',
   },
   {
     kind: 'avoid',

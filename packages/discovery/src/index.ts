@@ -47,10 +47,11 @@ export { smallLaptopIssues } from './inspect/small-laptop.js'
 export { coverageNotes, coversDesign, describeCoverage } from './inspect/coverage.js'
 export { describeInspectionFacts } from './visual-score/inspection-facts.js'
 export {
+  VISUAL_SCORE_MODELS,
   VISUAL_SCORE_TOOL,
   buildVisualScoreRequest,
   parseVisualScore,
   scoreSiteVisually,
   visualScoreInputFromInspection,
 } from './visual-score/visual-score.js'
-export type { LabeledImage, VisualScoreInput, VisualScoreOptions, VisualScoreResult } from './visual-score/visual-score.js'
+export type { LabeledImage, VisualScoreInput, VisualScoreModel, VisualScoreOptions, VisualScoreResult } from './visual-score/visual-score.js'

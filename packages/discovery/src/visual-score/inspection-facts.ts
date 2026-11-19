@@ -1,5 +1,7 @@
 import type { PageFeatures, SiteInspection, ViewInspection } from '@modernizer/schema'
 
+import { describeHeaderBars, summarizeHeaderBars } from './header-bars.js'
+
 const VIEW_LABELS: Record<ViewInspection['viewport'], string> = { desktop: 'Laptop', mobile: 'Phone', small: 'Small laptop' }
 
 const viewFacts = (label: string, f: PageFeatures): string[] => {
@@ -33,6 +35,8 @@ export const describeInspectionFacts = (inspection: SiteInspection): string => {
     lines.push(...viewFacts(VIEW_LABELS[view.viewport], view.features))
   }
   const laptop = inspection.views.find((v) => v.viewport === 'desktop')?.features
+  const bars = laptop?.headerBands ? summarizeHeaderBars(laptop.headerBands) : null
+  if (bars) lines.push(describeHeaderBars('Laptop', bars))
   if (laptop?.fonts.length) lines.push(`Main fonts: ${laptop.fonts.join(', ')}`)
   if (laptop?.copyright) lines.push(`Copyright year in the footer: ${laptop.copyright}`)
 
