@@ -180,6 +180,9 @@ importers:
 
   packages/discovery:
     dependencies:
+      '@anthropic-ai/sdk':
+        specifier: ^0.82.0
+        version: 0.82.0(zod@3.25.76)
       '@modernizer/schema':
         specifier: workspace:*
         version: link:../schema

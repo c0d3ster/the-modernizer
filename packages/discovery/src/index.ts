@@ -45,3 +45,14 @@ export { detectProjectFeatures } from './inspect/project-features.js'
 export type { ProjectFeatureInput } from './inspect/project-features.js'
 export { smallLaptopIssues } from './inspect/small-laptop.js'
 export { coverageNotes, coversDesign, describeCoverage } from './inspect/coverage.js'
+export { CALIBRATION_NOTES, DESIGN_RULES, PITCH_GUIDE, RUBRIC_VERSION, RULE_AREAS, SCORE_LEVELS } from './visual-score/rubric.js'
+export type { DesignRule, RuleArea } from './visual-score/rubric.js'
+export { describeInspectionFacts } from './visual-score/inspection-facts.js'
+export {
+  VISUAL_SCORE_TOOL,
+  buildVisualScoreRequest,
+  parseVisualScore,
+  scoreSiteVisually,
+  visualScoreInputFromInspection,
+} from './visual-score/visual-score.js'
+export type { LabeledImage, VisualScoreInput, VisualScoreOptions, VisualScoreResult } from './visual-score/visual-score.js'
