@@ -92,6 +92,26 @@ export const buildNav = (nav: NavItem[], rootUrl: string, pagePathnames: Set<str
     .slice(0, navMaxItems)
 }
 
+// Drops the site-name suffix page titles usually carry: "About | Amos Family Dentistry" -> "About"
+const navLabelFromTitle = (title: string): string => (title.split(/\s+[|–—-]\s+/)[0] ?? title).trim()
+
+/**
+ * The menu to build from: the extracted one, or, when extraction found none, the crawled pages in
+ * crawl order (home excluded, since the logo links there).
+ */
+export const navSource = ({ nav, pages, rootUrl }: Pick<SiteSchema, 'nav' | 'pages' | 'rootUrl'>): NavItem[] => {
+  if (nav.length) return nav
+  const root = unwrapWaybackUrl(rootUrl)
+  return pages.flatMap((p) => {
+    try {
+      const path = new URL(unwrapWaybackUrl(p.url), root).pathname.replace(/\/$/, '') || '/'
+      return path === '/' || !p.title ? [] : [{ label: navLabelFromTitle(p.title), url: p.url }]
+    } catch {
+      return []
+    }
+  })
+}
+
 /** @deprecated Use buildNav instead — flattenNav destroys hierarchy */
 export const flattenNav = (nav: NavItem[], rootUrl: string): Array<{ label: string; url: string }> => {
   const seen = new Set<string>()
@@ -110,7 +130,7 @@ export const flattenNav = (nav: NavItem[], rootUrl: string): Array<{ label: stri
  * Footer contact props and nav cap without editing this file’s string shape for one-offs.
  */
 export const generateLayout = (schema: SiteSchema, style?: SiteStyle): string => {
-  const { siteName, nav, tagline, rootUrl, pages } = schema
+  const { siteName, tagline, rootUrl, pages } = schema
   const navMaxItems = schema.generator?.navMaxItems ?? 7
   const resolvedRootUrl = unwrapWaybackUrl(rootUrl)
   const pagePathnames = new Set(
@@ -122,7 +142,7 @@ export const generateLayout = (schema: SiteSchema, style?: SiteStyle): string =>
       }
     })
   )
-  const builtNav = buildNav(nav, rootUrl, pagePathnames, navMaxItems)
+  const builtNav = buildNav(navSource(schema), rootUrl, pagePathnames, navMaxItems)
   const navLiteral = JSON.stringify(builtNav, null, 2)
   const description = tagline ?? siteName
 
@@ -142,6 +162,7 @@ export const generateLayout = (schema: SiteSchema, style?: SiteStyle): string =>
   return `import type { ReactElement, ReactNode } from 'react'
 import { Navbar } from '@/components/layout/Navbar'
 import { Footer } from '@/components/layout/Footer'
+import type { NavItem } from '@/types/schema'
 ${fonts ? `${fonts.imports}
 ` : ''}import './globals.css'
 ${fonts ? `
@@ -152,7 +173,7 @@ export const metadata = {
   description: ${JSON.stringify(description)},
 }
 
-const nav = ${navLiteral}
+const nav: NavItem[] = ${navLiteral}
 
 const RootLayout = ({ children }: { children: ReactNode }): ReactElement => {
   return (

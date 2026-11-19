@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
-import { buildNav } from './layout-generator.js'
-import type { NavItem } from '@modernizer/schema'
+import { buildNav, navSource } from './layout-generator.js'
+import { PageArchetype } from '@modernizer/schema'
+import type { NavItem, SiteSchema } from '@modernizer/schema'
 
 const rootUrl = 'https://edgehillrecovery.org/'
 
@@ -121,5 +122,22 @@ describe('buildNav (external top-level)', () => {
     const result = buildNav(nav, 'https://mysite.com/', crawled, 7)
     expect(result).toHaveLength(1)
     expect(result[0]).toEqual({ label: 'Partner', url: 'https://example.org/partner' })
+  })
+})
+
+describe('navSource', () => {
+  const page = (url: string, title: string): SiteSchema['pages'][number] => ({ url, title, archetype: PageArchetype.Generic, blocks: [] })
+
+  it('uses the extracted menu when there is one', () => {
+    const nav = [{ label: 'About', url: '/about' }]
+    expect(navSource({ nav, pages: [], rootUrl: 'https://example.com/' })).toBe(nav)
+  })
+
+  it('builds a menu from the crawled pages when extraction found none', () => {
+    const pages = [page('https://example.com/', 'Home'), page('https://example.com/about', 'About Dr. Amos | Amos Family Dentistry'), page('https://example.com/services', 'Services – Amos Family Dentistry')]
+    expect(navSource({ nav: [], pages, rootUrl: 'https://example.com/' })).toEqual([
+      { label: 'About Dr. Amos', url: 'https://example.com/about' },
+      { label: 'Services', url: 'https://example.com/services' },
+    ])
   })
 })
