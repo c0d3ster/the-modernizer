@@ -63,6 +63,7 @@ const nullable = (schema: Record<string, unknown>): Record<string, unknown> => (
 export const VISUAL_SCORE_TOOL: Anthropic.Tool = {
   name: TOOL_NAME,
   description: 'Record the visual design rating for the site in the screenshots.',
+  strict: true,
   input_schema: {
     type: 'object',
     additionalProperties: false,

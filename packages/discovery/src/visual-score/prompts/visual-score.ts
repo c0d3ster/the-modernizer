@@ -44,7 +44,7 @@ HOW TO WORK
 - Things screenshots cannot show (animations, hover effects, video playback, inner pages, slow loading) go in cantJudge, not in findings. If the measured page is not the home page, say so in cantJudge.
 - Tag issues only from this list: ${VISUAL_ISSUES.join(', ')}.
 - Write the note like the designer does: one or two plain sentences naming the biggest problems or, for a strong site, what makes it work. No filler.
-- If the screenshots show a bot check, an error or an empty page instead of the site, set unassessable to true and leave overall and pitch null.
+- If the screenshots show a bot check, an error or an empty page instead of the site, set unassessable to true and leave overall and pitch null. A business page that lives inside a directory or another site is still assessable: rate what the visitor sees and record the not-own-site problem.
 - Always answer by calling the record_visual_score tool.
 `.trim()
 
