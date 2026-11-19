@@ -45,6 +45,10 @@ export const collectImageHostnames = (schema: SiteSchema): string[] => {
   for (const page of schema.pages) {
     for (const block of page.blocks) collectFromBlock(block)
   }
+  // The logo and the site's photo inventory, which generators may place anywhere
+  tryAdd(schema.logoUrl)
+  tryAdd(schema.heroImageUrl)
+  schema.images?.forEach((img) => tryAdd(img.url))
 
   return [...hostnames]
 }
