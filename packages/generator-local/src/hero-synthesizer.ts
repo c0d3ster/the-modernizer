@@ -1,5 +1,6 @@
 import type { SiteSchema, PageSchema, HeroBlock } from '@modernizer/schema'
 import { PageArchetype } from '@modernizer/schema'
+import type { SiteAction } from './site-style.js'
 
 /**
  * The sample hero image shipped with the generator — copied to public/sample-hero.jpg
@@ -70,7 +71,7 @@ export const synthesizePageHeaders = (schema: SiteSchema): SiteSchema => {
  * The background image comes from the first extracted hero image found anywhere
  * in the site, falling back to the bundled sample-hero.jpg.
  */
-export const synthesizeHero = (schema: SiteSchema): SiteSchema => {
+export const synthesizeHero = (schema: SiteSchema, action?: SiteAction | null): SiteSchema => {
   if (schema.generator?.noHero) return schema
 
   const rootUrl = schema.rootUrl
@@ -85,7 +86,14 @@ export const synthesizeHero = (schema: SiteSchema): SiteSchema => {
   if (homeIndex === -1) return schema
 
   const home = schema.pages[homeIndex]!
-  if (home.blocks[0]?.type === 'hero') return schema
+  const first = home.blocks[0]
+  if (first?.type === 'hero') {
+    // An extracted hero with no button gets the site's main action
+    if (first.ctaText || !action) return schema
+    const pages = [...schema.pages]
+    pages[homeIndex] = { ...home, blocks: [{ ...first, ctaText: action.text, ctaUrl: action.url }, ...home.blocks.slice(1)] }
+    return { ...schema, pages }
+  }
 
   // Preference order for background image:
   // 1. An already-extracted hero block with a real image URL (from another page)
@@ -107,8 +115,8 @@ export const synthesizeHero = (schema: SiteSchema): SiteSchema => {
     type: 'hero',
     heading: schema.siteName,
     subheading: schema.tagline,
-    ctaText: ctaPage ? 'Get in touch' : undefined,
-    ctaUrl: ctaPage ? toRelativePath(ctaPage, schema.rootUrl) : undefined,
+    ctaText: action?.text ?? (ctaPage ? 'Get in touch' : undefined),
+    ctaUrl: action?.url ?? (ctaPage ? toRelativePath(ctaPage, schema.rootUrl) : undefined),
     backgroundImageUrl: extractedBg,
   }
 

@@ -1,5 +1,6 @@
 import type { SiteSchema, NavItem } from '@modernizer/schema'
 import { unwrapWaybackUrl } from './wayback-utils.js'
+import { fontSetup, type SiteStyle } from './site-style.js'
 
 const toRelative = (url: string, baseUrl: string): string | null => {
   if (!url || url === '#') return null
@@ -108,7 +109,7 @@ export const flattenNav = (nav: NavItem[], rootUrl: string): Array<{ label: stri
  * Root layout codegen. Extend `SiteSchema.footer` / `SiteSchema.generator` to change
  * Footer contact props and nav cap without editing this file’s string shape for one-offs.
  */
-export const generateLayout = (schema: SiteSchema): string => {
+export const generateLayout = (schema: SiteSchema, style?: SiteStyle): string => {
   const { siteName, nav, tagline, rootUrl, pages } = schema
   const navMaxItems = schema.generator?.navMaxItems ?? 7
   const resolvedRootUrl = unwrapWaybackUrl(rootUrl)
@@ -131,11 +132,21 @@ export const generateLayout = (schema: SiteSchema): string => {
   if (schema.footer?.address) footerProps.push(`address={${JSON.stringify(schema.footer.address)}}`)
   const footerPropsStr = footerProps.length > 0 ? ` ${footerProps.join(' ')}` : ''
 
+  // The vertical's fonts, main action and header phone; without a style, the plain shell
+  const fonts = style ? fontSetup(style.profile) : null
+  const navProps: string[] = []
+  if (style?.primaryAction) navProps.push(`ctaText={${JSON.stringify(style.primaryAction.text)}}`, `ctaUrl={${JSON.stringify(style.primaryAction.url)}}`)
+  if (style?.headerPhone) navProps.push(`phone={${JSON.stringify(style.headerPhone)}}`)
+  const navPropsStr = navProps.length > 0 ? ` ${navProps.join(' ')}` : ''
+
   return `import type { ReactElement, ReactNode } from 'react'
 import { Navbar } from '@/components/layout/Navbar'
 import { Footer } from '@/components/layout/Footer'
-import './globals.css'
-
+${fonts ? `${fonts.imports}
+` : ''}import './globals.css'
+${fonts ? `
+${fonts.declarations}
+` : ''}
 export const metadata = {
   title: ${JSON.stringify(siteName)},
   description: ${JSON.stringify(description)},
@@ -145,9 +156,9 @@ const nav = ${navLiteral}
 
 const RootLayout = ({ children }: { children: ReactNode }): ReactElement => {
   return (
-    <html lang='en'>
+    <html lang='en'${fonts ? ` className={${fonts.className}}` : ''}>
       <body>
-        <Navbar siteName={${JSON.stringify(siteName)}} nav={nav} />
+        <Navbar siteName={${JSON.stringify(siteName)}} nav={nav}${navPropsStr} />
         {children}
         <Footer siteName={${JSON.stringify(siteName)}} nav={nav}${footerPropsStr} />
       </body>

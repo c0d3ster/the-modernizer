@@ -1,4 +1,5 @@
 import type { SiteSchema, ContentBlock, BrandColors } from '@modernizer/schema'
+import type { SiteTheme } from '@modernizer/design-guide'
 
 /**
  * Walks all blocks across all pages and collects unique external image hostnames.
@@ -182,6 +183,10 @@ export default eslintConfig
 /** Warm neutral when the schema does not specify a page background (avoids harsh #fff). */
 const DEFAULT_PAGE_BACKGROUND = '#f4f1ec'
 
+/** Only emit plausible CSS lengths (rem, px, em) for radii and tracking. */
+const sanitizeLength = (value: string | undefined, fallback: string): string =>
+  value && /^-?\d*\.?\d+(rem|px|em)$/.test(value.trim()) ? value.trim() : fallback
+
 /** Only emit values that are plausible CSS colors; avoids broken or hostile input in generated CSS. */
 const sanitizeThemeColor = (value: string | undefined, fallback: string): string => {
   if (value == null || typeof value !== 'string') return fallback
@@ -198,10 +203,22 @@ const sanitizeThemeColor = (value: string | undefined, fallback: string): string
  * win over Tailwind utilities live in `@layer base` — anything left unlayered would override
  * layered utilities like `mx-auto`/`px-4` regardless of specificity, per the CSS cascade layers spec.
  */
-export const generateGlobalsCss = (brandColors: BrandColors): string => {
+export const generateGlobalsCss = (brandColors: BrandColors, theme?: SiteTheme): string => {
   const primary = sanitizeThemeColor(brandColors.primary, '#2563eb')
   const primaryForeground = sanitizeThemeColor(brandColors.text, '#ffffff')
-  const background = sanitizeThemeColor(brandColors.background, DEFAULT_PAGE_BACKGROUND)
+  // A site's own background wins; otherwise the vertical's neutral, then the warm default
+  const background = sanitizeThemeColor(brandColors.background, sanitizeThemeColor(theme?.background, DEFAULT_PAGE_BACKGROUND))
+  const tone = (value: string | undefined, fallback: string): string => sanitizeThemeColor(value, fallback)
+  const foreground = tone(theme?.foreground, '#1c1917')
+  const muted = tone(theme?.muted, '#e8e5e0')
+  const mutedForeground = tone(theme?.mutedForeground, '#57534e')
+  const card = tone(theme?.card, '#fffdfb')
+  const border = tone(theme?.border, '#e0d9d0')
+  const accent = tone(theme?.accent, '#ece8e2')
+  const cardRadius = sanitizeLength(theme?.cardRadius, '0.75rem')
+  const buttonRadius = sanitizeLength(theme?.buttonRadius, '0.375rem')
+  const headingTransform = theme?.headingTransform ?? 'none'
+  const headingTracking = sanitizeLength(theme?.headingTracking, '-0.02em')
 
   return `@import "tailwindcss";
 @source "../";
@@ -221,35 +238,40 @@ export const generateGlobalsCss = (brandColors: BrandColors): string => {
   --color-primary-foreground: ${primaryForeground};
 
   --color-background: ${background};
-  --color-foreground: #1c1917;
+  --color-foreground: ${foreground};
 
-  --color-muted: #e8e5e0;
-  --color-muted-foreground: #57534e;
+  --color-muted: ${muted};
+  --color-muted-foreground: ${mutedForeground};
 
-  --color-secondary: #e5e1da;
-  --color-secondary-foreground: #1c1917;
+  --color-secondary: ${muted};
+  --color-secondary-foreground: ${foreground};
 
-  --color-card: #fffdfb;
-  --color-card-foreground: #1c1917;
+  --color-card: ${card};
+  --color-card-foreground: ${foreground};
 
-  --color-popover: #fffdfb;
-  --color-popover-foreground: #1c1917;
+  --color-popover: ${card};
+  --color-popover-foreground: ${foreground};
 
-  --color-border: #e0d9d0;
-  --color-input: #e0d9d0;
+  --color-border: ${border};
+  --color-input: ${border};
   --color-ring: ${primary};
 
-  --color-accent: #ece8e2;
-  --color-accent-foreground: #1c1917;
+  --color-accent: ${accent};
+  --color-accent-foreground: ${foreground};
 
   --color-destructive: #ef4444;
   --color-destructive-foreground: #ffffff;
+
+  /* Fonts come from next/font variables set on <html> in the root layout; system fonts otherwise */
+  --font-sans: var(--font-body, ui-sans-serif, system-ui, sans-serif);
+  --font-heading: var(--font-display, var(--font-body, ui-sans-serif, system-ui, sans-serif));
 
   --radius: 0.5rem;
   --radius-sm: calc(0.5rem - 2px);
   --radius-md: calc(0.5rem - 2px);
   --radius-lg: 0.5rem;
-  --radius-xl: calc(0.5rem + 4px);
+  --radius-xl: ${cardRadius};
+  --radius-button: ${buttonRadius};
 
   --animate-accordion-down: accordion-down 0.2s ease-out;
   --animate-accordion-up: accordion-up 0.2s ease-out;
@@ -262,6 +284,12 @@ export const generateGlobalsCss = (brandColors: BrandColors): string => {
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
+    font-family: var(--font-sans);
+  }
+  h1, h2, h3 {
+    font-family: var(--font-heading);
+    text-transform: ${headingTransform};
+    letter-spacing: ${headingTracking};
   }
 }
 `

@@ -22,6 +22,7 @@
     "typescript": "5.9.2"
   },
   "dependencies": {
+    "@modernizer/design-guide": "workspace:*",
     "@modernizer/crawler": "workspace:*",
     "@modernizer/extractor": "workspace:*",
     "@modernizer/generator-local": "workspace:*",

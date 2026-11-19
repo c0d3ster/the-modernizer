@@ -40,7 +40,8 @@ const getBrowser = async (headless: boolean): Promise<Browser> => {
     launchedHeadless = null
   }
 
-  launching = chromium.launch({ headless }).then((b) => {
+  // MODERNIZER_CHROMIUM_PATH points at a Chromium build when the one Playwright expects isn't installed
+  launching = chromium.launch({ headless, executablePath: process.env.MODERNIZER_CHROMIUM_PATH }).then((b) => {
     browser = b
     launchedHeadless = headless
     launching = null

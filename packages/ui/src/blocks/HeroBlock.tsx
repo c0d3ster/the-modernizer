@@ -3,92 +3,107 @@ import { Button } from '../shadcn/button'
 import { cn } from '../lib/cn'
 import { container } from '../styles/tokens'
 
+/**
+ * overlay: full-bleed photo, headline bottom-left over a soft dark gradient (trades, cafes).
+ * panel: full-bleed photo, headline on a light translucent panel (dental, professional services).
+ * centered: full-bleed photo with a dark wash, everything centered (restaurants).
+ */
+export type HeroVariant = 'overlay' | 'panel' | 'centered'
+
 interface HeroBlockProps {
   block: HeroBlockData
+  variant?: HeroVariant
+  // A second action beside the main one, e.g. a tap-to-call link
+  secondaryCta?: { text: string; url: string }
 }
 
-export const HeroBlock = ({ block }: HeroBlockProps): React.ReactElement => {
-  const { heading, subheading, ctaText, ctaUrl, backgroundImageUrl, compact } = block
+const Actions = ({ block, secondaryCta, onPhoto, light }: { block: HeroBlockData; secondaryCta?: HeroBlockProps['secondaryCta']; onPhoto: boolean; light: boolean }): React.ReactElement | null => {
+  const { ctaText, ctaUrl } = block
+  if (!(ctaText && ctaUrl) && !secondaryCta) return null
+  return (
+    <div className="mt-8 flex flex-wrap items-center gap-3">
+      {ctaText && ctaUrl && (
+        <Button asChild size="lg">
+          <a href={ctaUrl}>{ctaText}</a>
+        </Button>
+      )}
+      {secondaryCta && (
+        <Button
+          asChild
+          size="lg"
+          variant="outline"
+          className={cn(onPhoto && !light && 'border-white/70 bg-transparent text-white hover:bg-white/10 hover:text-white')}
+        >
+          <a href={secondaryCta.url}>{secondaryCta.text}</a>
+        </Button>
+      )}
+    </div>
+  )
+}
 
-  // Compact mode: page-title banner for inner pages — no image, reduced height
+export const HeroBlock = ({ block, variant = 'overlay', secondaryCta }: HeroBlockProps): React.ReactElement => {
+  const { heading, subheading, backgroundImageUrl, compact } = block
+
+  // Compact mode: page-title banner for inner pages, no image
   if (compact && !backgroundImageUrl) {
     return (
-      <section className="bg-primary py-10 text-primary-foreground md:py-14">
+      <section className="border-b border-border bg-muted/60 py-12 md:py-16">
         <div className={cn(container)}>
-          <h1 className="text-3xl font-bold tracking-tight md:text-4xl">{heading}</h1>
-          {subheading && (
-            <p className="mt-3 max-w-2xl text-base opacity-85">{subheading}</p>
-          )}
+          <h1 className="text-3xl font-bold md:text-5xl">{heading}</h1>
+          {subheading && <p className="mt-4 max-w-2xl text-lg text-muted-foreground">{subheading}</p>}
         </div>
       </section>
     )
   }
 
-  return (
-    <section
-      className={cn(
-        'relative w-full',
-        backgroundImageUrl
-          ? 'min-h-[93dvh] bg-black text-white'
-          : 'flex min-h-[480px] flex-col items-center bg-primary py-20 text-primary-foreground lg:py-32'
-      )}
-    >
-      {backgroundImageUrl && (
-        <>
-          {/* ~93dvh leaves room for fixed header; flow content must not stretch the section */}
-          <div className="absolute inset-0 bg-black">
-            <img
-              src={backgroundImageUrl}
-              alt=""
-              className="mx-auto block h-full w-full max-w-5xl object-cover object-bottom md:max-w-6xl lg:max-w-7xl"
-              aria-hidden="true"
-            />
+  // No photo: a calm brand-colored band
+  if (!backgroundImageUrl) {
+    return (
+      <section className="bg-primary py-20 text-primary-foreground lg:py-32">
+        <div className={cn(container, variant === 'centered' && 'text-center')}>
+          <div className={cn('max-w-3xl', variant === 'centered' && 'mx-auto')}>
+            <h1 className="text-4xl font-bold lg:text-6xl">{heading}</h1>
+            {subheading && <p className="mt-6 text-lg opacity-90 lg:text-xl">{subheading}</p>}
+            <div className={cn(variant === 'centered' && 'flex justify-center')}>
+              <Actions block={block} secondaryCta={secondaryCta} onPhoto={false} light={false} />
+            </div>
           </div>
-          <div
-            className="absolute inset-0 bg-gradient-to-b from-black/55 via-black/15 to-transparent"
-            aria-hidden="true"
-          />
-        </>
-      )}
+        </div>
+      </section>
+    )
+  }
+
+  const panel = variant === 'panel'
+  const centered = variant === 'centered'
+
+  return (
+    // Fills the first screen below the sticky header, so the next section never peeks in half cut
+    <section className="relative flex min-h-[calc(100svh-4rem)] w-full overflow-hidden lg:min-h-[calc(100svh-5rem)]">
+      <img src={backgroundImageUrl} alt="" aria-hidden="true" className="absolute inset-0 h-full w-full object-cover object-center" />
       <div
+        aria-hidden="true"
         className={cn(
-          container,
-          'relative z-10',
-          backgroundImageUrl && 'absolute inset-x-0 top-0 pt-10 md:pt-16'
+          'absolute inset-0',
+          centered && 'bg-black/45',
+          panel && 'bg-gradient-to-r from-black/25 via-black/10 to-transparent',
+          !centered && !panel && 'bg-gradient-to-t from-black/75 via-black/35 to-black/5'
         )}
-      >
+      />
+      <div className={cn(container, 'relative z-10 flex w-full py-16 lg:py-24', centered ? 'items-center justify-center text-center' : panel ? 'items-center' : 'items-end')}>
         <div
           className={cn(
             'max-w-2xl',
-            backgroundImageUrl &&
-              'rounded-2xl bg-black/50 px-5 py-6 shadow-[0_8px_40px_rgba(0,0,0,0.45)] ring-1 ring-white/10 backdrop-blur-sm sm:px-6 sm:py-7'
+            panel && 'rounded-[var(--radius-xl,1rem)] bg-background/85 p-8 shadow-xl backdrop-blur-sm sm:p-10',
+            !panel && 'text-white'
           )}
         >
-          <h1
-            className={cn(
-              'text-4xl font-bold tracking-tight lg:text-5xl xl:text-6xl',
-              backgroundImageUrl && 'text-white [text-shadow:0_2px_20px_rgba(0,0,0,0.35)]'
-            )}
-          >
+          <h1 className={cn('text-4xl font-bold leading-tight sm:text-5xl lg:text-6xl', !panel && '[text-shadow:0_2px_24px_rgba(0,0,0,0.35)]')}>
             {heading}
           </h1>
-          {subheading && (
-            <p
-              className={cn(
-                'mt-6 text-lg lg:text-xl',
-                backgroundImageUrl ? 'text-white/95' : 'opacity-90'
-              )}
-            >
-              {subheading}
-            </p>
-          )}
-          {ctaText && ctaUrl && (
-            <div className="mt-8">
-              <Button asChild size="lg" variant={backgroundImageUrl ? 'default' : 'outline'}>
-                <a href={ctaUrl}>{ctaText}</a>
-              </Button>
-            </div>
-          )}
+          {subheading && <p className={cn('mt-5 text-lg lg:text-xl', panel ? 'text-muted-foreground' : 'text-white/90')}>{subheading}</p>}
+          <div className={cn(centered && 'flex justify-center')}>
+            <Actions block={block} secondaryCta={secondaryCta} onPhoto light={panel} />
+          </div>
         </div>
       </div>
     </section>

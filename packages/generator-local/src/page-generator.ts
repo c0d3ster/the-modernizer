@@ -81,15 +81,27 @@ const sanitizeBlock = (block: ContentBlock): ContentBlock => {
 // Blocks that own their own background (primary, black, etc.) — excluded from alternating rhythm
 const SELF_COLORED_BLOCKS = new Set(['hero', 'cta', 'stats'])
 
-const blockToJsx = (block: ContentBlock, alt: boolean): string => {
+/** How full-size heroes render: the vertical's hero variant, plus an optional second action (e.g. call). */
+export interface HeroStyle {
+  variant: 'overlay' | 'panel' | 'centered'
+  secondaryCta?: { text: string; url: string }
+}
+
+const heroProps = (block: ContentBlock, hero: HeroStyle | undefined): string => {
+  if (!hero || block.type !== 'hero' || block.compact) return ''
+  const secondary = hero.secondaryCta && hero.secondaryCta.url !== block.ctaUrl ? ` secondaryCta={${serializeValue(hero.secondaryCta, 2)}}` : ''
+  return ` variant='${hero.variant}'${secondary}`
+}
+
+const blockToJsx = (block: ContentBlock, alt: boolean, hero?: HeroStyle): string => {
   const component = blockTypeToComponent(block.type)
-  const blockLine = `<${component} block={${serializeValue(block, 2)}} />`
+  const blockLine = `<${component} block={${serializeValue(block, 2)}}${heroProps(block, hero)} />`
   const baseIndent = '      '
   if (!alt) return `${baseIndent}${blockLine}`
   return `${baseIndent}<div className="bg-muted/40">\n${baseIndent}  ${blockLine}\n${baseIndent}</div>`
 }
 
-export const generatePage = (page: PageSchema, componentName: string): string => {
+export const generatePage = (page: PageSchema, componentName: string, hero?: HeroStyle): string => {
   // Dedupe imports by component name
   const components = [...new Set(page.blocks.map((b) => blockTypeToComponent(b.type)))]
   const imports = components
@@ -100,8 +112,8 @@ export const generatePage = (page: PageSchema, componentName: string): string =>
   // Self-colored blocks (hero, cta, stats) break the sequence and reset the counter.
   let altCounter = 0
   const jsx = page.blocks.map(sanitizeBlock).map((block) => {
-    if (SELF_COLORED_BLOCKS.has(block.type)) { altCounter = 0; return blockToJsx(block, false) }
-    return blockToJsx(block, altCounter++ % 2 === 1)
+    if (SELF_COLORED_BLOCKS.has(block.type)) { altCounter = 0; return blockToJsx(block, false, hero) }
+    return blockToJsx(block, altCounter++ % 2 === 1, hero)
   }).join('\n')
 
   return `import type { ReactElement } from 'react'
