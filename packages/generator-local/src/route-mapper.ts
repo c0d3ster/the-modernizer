@@ -18,10 +18,10 @@ export const urlToComponentName = (url: string, baseUrl?: string): string => {
   const { pathname } = resolvedBase ? new URL(resolvedUrl, resolvedBase) : new URL(resolvedUrl)
   const clean = pathname.replace(/\/+$/, '')
   if (!clean) return 'HomePage'
-  // Capitalize each segment and each hyphenated word within it; prefix if the
-  // segment would start with a digit (invalid JS identifier).
+  // Capitalize each word of each segment, splitting on anything that can't be in an identifier
+  // ("contact.html", "about_us", "faq-page"); prefix if the result would start with a digit.
   const toPascal = (s: string): string => {
-    const joined = s.split('-').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join('')
+    const joined = s.split(/[^a-zA-Z0-9]+/).map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join('')
     return /^\d/.test(joined) ? `_${joined}` : joined
   }
   return clean.split('/').filter(Boolean).map(toPascal).join('') + 'Page'

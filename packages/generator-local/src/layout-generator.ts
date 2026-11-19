@@ -92,24 +92,94 @@ export const buildNav = (nav: NavItem[], rootUrl: string, pagePathnames: Set<str
     .slice(0, navMaxItems)
 }
 
-// Drops the site-name suffix page titles usually carry: "About | Amos Family Dentistry" -> "About"
-const navLabelFromTitle = (title: string): string => (title.split(/\s+[|–—-]\s+/)[0] ?? title).trim()
+const NAV_LABEL_MAX = 24
+const TITLE_SEPARATOR = /\s+[|–—-]\s+/
+
+/** "contact.html" -> "Contact", "frame-repair" -> "Frame Repair" */
+const labelFromPath = (path: string): string =>
+  (path.split('/').filter(Boolean).pop() ?? '')
+    .replace(/\.[a-z]{2,5}$/i, '')
+    .split(/[^a-zA-Z0-9]+/)
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(' ')
+
+/** Cuts at a word boundary so the label fits a menu. */
+const fitLabel = (label: string): string => {
+  if (label.length <= NAV_LABEL_MAX) return label
+  const words = label.split(' ')
+  while (words.length > 1 && words.join(' ').length > NAV_LABEL_MAX) words.pop()
+  return words.join(' ')
+}
+
+/**
+ * A short menu label for a page when the site's own menu wasn't extracted. Page titles carry the
+ * business name and SEO phrases ("Urgent Care - MEADOW BRANCH ANIMAL HOSPITAL"), so the name is
+ * dropped, and a title still too long for a menu gives way to the page's URL slug.
+ */
+export const navLabelFor = (title: string, path: string, siteName: string): string => {
+  const name = siteName.toLowerCase()
+  const parts = title.split(TITLE_SEPARATOR).map((t) => t.trim()).filter((t) => t && !t.toLowerCase().includes(name) && !name.includes(t.toLowerCase()))
+  const fromTitle = parts[0] ?? ''
+  if (fromTitle && fromTitle.length <= NAV_LABEL_MAX) return fromTitle
+  return labelFromPath(path) || fitLabel(fromTitle)
+}
+
+/** Words most labels start or end with ("Winchester ... Attorney") say nothing in a menu. */
+const dropSharedEdgeWords = (labels: readonly string[]): string[] => {
+  if (labels.length < 3) return [...labels]
+  const share = (pick: (words: string[]) => string | undefined): string | undefined => {
+    const counts = new Map<string, number>()
+    for (const l of labels) {
+      const w = pick(l.split(' '))?.toLowerCase()
+      if (w) counts.set(w, (counts.get(w) ?? 0) + 1)
+    }
+    const [word, count] = [...counts.entries()].sort((a, b) => b[1] - a[1])[0] ?? []
+    return word && count !== undefined && count / labels.length >= 0.6 ? word : undefined
+  }
+  const first = share((w) => w[0])
+  const last = share((w) => w[w.length - 1])
+  return labels.map((label) => {
+    const words = label.split(' ')
+    const trimmed = words.filter((w, i) => !((i === 0 && w.toLowerCase() === first) || (i === words.length - 1 && w.toLowerCase() === last)))
+    return trimmed.length ? trimmed.join(' ') : label
+  })
+}
+
+// Legal and utility pages that belong in the footer, not the menu
+const NOT_IN_MENU = /privacy|terms|\btou\b|sitemap|accessibility|disclaimer|cookie/i
 
 /**
  * The menu to build from: the extracted one, or, when extraction found none, the crawled pages in
  * crawl order (home excluded, since the logo links there).
  */
-export const navSource = ({ nav, pages, rootUrl }: Pick<SiteSchema, 'nav' | 'pages' | 'rootUrl'>): NavItem[] => {
+export const navSource = ({ nav, pages, rootUrl, siteName }: Pick<SiteSchema, 'nav' | 'pages' | 'rootUrl' | 'siteName'>): NavItem[] => {
   if (nav.length) return nav
   const root = unwrapWaybackUrl(rootUrl)
-  return pages.flatMap((p) => {
+  const items = pages.flatMap((p) => {
     try {
       const path = new URL(unwrapWaybackUrl(p.url), root).pathname.replace(/\/$/, '') || '/'
-      return path === '/' || !p.title ? [] : [{ label: navLabelFromTitle(p.title), url: p.url }]
+      if (path === '/' || !p.title || NOT_IN_MENU.test(`${path} ${p.title}`)) return []
+      return [{ label: navLabelFor(p.title, path, siteName), url: p.url }]
     } catch {
       return []
     }
   })
+  const labels = dropSharedEdgeWords(items.map((i) => i.label)).map(fitLabel)
+  return items.map((item, i) => ({ ...item, label: labels[i] ?? item.label }))
+}
+
+// Characters of menu text that fit beside the logo and buttons at small-laptop width (1366px)
+const NAV_CHAR_BUDGET = 64
+
+/** How many top-level links to show before the rest go under "More". */
+export const visibleNavCount = (labels: readonly string[], max = 6): number => {
+  let used = 0
+  for (const [i, label] of labels.slice(0, max).entries()) {
+    used += label.length + 4
+    if (used > NAV_CHAR_BUDGET) return Math.max(2, i)
+  }
+  return Math.min(labels.length, max)
 }
 
 /** @deprecated Use buildNav instead — flattenNav destroys hierarchy */
@@ -156,8 +226,11 @@ export const generateLayout = (schema: SiteSchema, style?: SiteStyle): string =>
   const fonts = style ? fontSetup(style.profile) : null
   const navProps: string[] = []
   if (schema.logoUrl) navProps.push(`logoUrl={${JSON.stringify(schema.logoUrl)}}`)
-  if (style?.primaryAction) navProps.push(`ctaText={${JSON.stringify(style.primaryAction.text)}}`, `ctaUrl={${JSON.stringify(style.primaryAction.url)}}`)
+  // A main action that only dials the number would sit beside the same number as the phone button
+  const ctaDuplicatesPhone = Boolean(style?.headerPhone && style.primaryAction?.url.startsWith('tel:'))
+  if (style?.primaryAction && !ctaDuplicatesPhone) navProps.push(`ctaText={${JSON.stringify(style.primaryAction.text)}}`, `ctaUrl={${JSON.stringify(style.primaryAction.url)}}`)
   if (style?.headerPhone) navProps.push(`phone={${JSON.stringify(style.headerPhone)}}`)
+  navProps.push(`maxVisible={${visibleNavCount(builtNav.map((n) => n.label))}}`)
   const navPropsStr = navProps.length > 0 ? ` ${navProps.join(' ')}` : ''
 
   return `import type { ReactElement, ReactNode } from 'react'
