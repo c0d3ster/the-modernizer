@@ -92,3 +92,13 @@ export type {
   ViewInspection,
   ViewportName,
 } from './inspection.js'
+
+export {
+  PITCH_VALUES,
+  VISUAL_ISSUES,
+  pitchSchema,
+  visualFindingSchema,
+  visualIssueSchema,
+  visualScoreSchema,
+} from './visual-score.js'
+export type { Pitch, VisualFinding, VisualIssue, VisualScore } from './visual-score.js'
