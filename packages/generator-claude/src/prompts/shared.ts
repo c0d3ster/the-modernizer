@@ -2,6 +2,7 @@ import type { BrandColors, NavItem, SiteSchema } from '@modernizer/schema'
 import { designDirection, profileFor, verticalOf } from '@modernizer/design-guide'
 import { relativizeNavItems } from '../route-utils.js'
 import { reconcileNav } from '../nav-reconciliation.js'
+import { siteContact } from '../site-contact.js'
 
 export const formatColorInfo = (brandColors: BrandColors): string =>
   [
@@ -43,7 +44,8 @@ export const LINK_GUARDRAIL =
  * consistent cacheable block across all of them, just a different one than the shell used.
  */
 export const buildSiteContextBlock = (schema: SiteSchema, designSystemSpec?: string): string => {
-  const { siteName, rootUrl, brandColors, nav, pages, tagline, footer } = schema
+  const { siteName, rootUrl, brandColors, nav, pages, tagline } = schema
+  const footer = siteContact(schema)
   // Nav is extracted from the site's own <nav> menu HTML; pages come from crawling
   // independently, and the two can drift out of sync (a nav entry with no crawled page 404s;
   // a crawled page with no nav entry is unreachable). Reconcile before handing nav to Claude
@@ -70,6 +72,9 @@ ${footer?.address ? `- Address: ${footer.address}` : ''}
 - ${ICON_GUARDRAIL}
 - ${LINK_GUARDRAIL}
 - Mobile-first responsive design
+
+## Facts
+Use only facts that appear in this prompt or the page content. Never invent phone numbers, addresses, emails, hours, prices, ratings, review counts, years in business, awards or service areas, and never use placeholder numbers like 555. If a fact you would like to show is missing, leave that element out.
 
 ${direction}
 

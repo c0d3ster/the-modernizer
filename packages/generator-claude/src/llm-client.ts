@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { z } from 'zod'
+import { syntaxErrors } from './syntax-check.js'
 
 const MODEL = 'claude-sonnet-5'
 const MAX_TOKENS = 16_000
@@ -165,6 +166,14 @@ export const callClaudeForFiles = async (prompt: PromptParts, label: string, ver
         throw new Error(`[${label}] Claude returned malformed files (stop_reason: ${response.stop_reason}): ${parsed.error.message}`)
       }
       continue
+    }
+
+    // A corrupted line in a generated file breaks the whole build; retry the call when one parses badly
+    const errors = syntaxErrors(parsed.data.files)
+    if (errors.length) {
+      process.stderr.write(`  [${label}] generated code has syntax errors (attempt ${attempt}/${MAX_ATTEMPTS}): ${errors.slice(0, 3).join('; ')}\n`)
+      // Keep the last attempt's files rather than lose the page, but the warning above says why it may not build
+      if (attempt < MAX_ATTEMPTS) continue
     }
 
     files = parsed.data.files
