@@ -402,6 +402,7 @@ Businesses with an existing website, sorted by modernity score ascending — low
 | `psi_seo` | 0-100 | Raw Lighthouse SEO score |
 | `psi_accessibility` | 0-100 | Raw Lighthouse accessibility score |
 | `notes` | string | Details — e.g. "wp-theme: twentyfifteen, copyright: 2016" |
+| `vertical` | string | Business type of the Places query that found it (e.g. `plumber`). Used to pick the generator's design profile. Older files without this column still parse. |
 
 ### `greenfield-leads.csv`
 

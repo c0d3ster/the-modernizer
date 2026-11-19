@@ -47,6 +47,13 @@ describe('parseCandidatesCsv', () => {
     expect(parsed?.business_name).toBe('Joe "The Pipe" Co')
   })
 
+  it('reads the vertical column, and older files written without it', () => {
+    const row = 'A,,,,,https://a.example.com,50,false,false,,false,false,false,false,false,50,,,,,'
+    expect(parseCandidatesCsv(`${HEADER}\n${row},plumber\n`)[0]?.vertical).toBe('plumber')
+    const legacyHeader = CANDIDATE_SCORE_COLUMNS.filter((c) => c !== 'vertical').join(',')
+    expect(parseCandidatesCsv(`${legacyHeader}\n${row}\n`)[0]?.vertical).toBe('')
+  })
+
   it('rejects a header that does not match the column spec', () => {
     expect(() => parseCandidatesCsv('business_name,score\nA,1\n')).toThrow(
       'header'

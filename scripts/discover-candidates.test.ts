@@ -311,6 +311,7 @@ describe('runDiscovery', () => {
         address: '1 Good St',
         city: 'Austin',
         state: 'TX',
+        vertical: 'plumber',
       },
     ])
 
@@ -405,6 +406,7 @@ const baseCandidate: ContinuingCandidate = {
   address: '1 Good St, Austin, TX',
   city: 'Austin',
   state: 'TX',
+  vertical: 'plumber',
 }
 
 const MODERN_HTML = `<html><head>
@@ -540,7 +542,7 @@ describe('candidatesToCsv', () => {
     expect(header).toBe(
       'business_name,phone,address,city,state,url,score,no_ssl,no_viewport,last_changed,' +
         'old_jquery,old_wp_theme,no_og_tags,table_layout,ie_compatible,static_score,' +
-        'psi_score,psi_performance,psi_seo,psi_accessibility,notes'
+        'psi_score,psi_performance,psi_seo,psi_accessibility,notes,vertical'
     )
   })
 
@@ -549,7 +551,7 @@ describe('candidatesToCsv', () => {
     expect(row).toBe(
       'Good Plumbing Co,(512) 555-0101,"1 Good St, Austin, TX",Austin,TX,' +
         'https://goodplumbing.example.com,50,false,true,,false,false,true,false,false,50,' +
-        ',,,,"no_viewport, no_og_tags, psi: unavailable, static-only score"'
+        ',,,,"no_viewport, no_og_tags, psi: unavailable, static-only score",plumber'
     )
   })
 
@@ -587,5 +589,14 @@ describe('readContinuingCandidates', () => {
     await writeFile(filePath, JSON.stringify([baseCandidate]), 'utf-8')
 
     expect(await readContinuingCandidates(filePath)).toEqual([baseCandidate])
+  })
+
+  it('reads a file written before candidates kept their vertical', async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), 'discover-'))
+    const filePath = path.join(dir, 'continuing-candidates.json')
+    const { vertical: _vertical, ...legacy } = baseCandidate
+    await writeFile(filePath, JSON.stringify([legacy]), 'utf-8')
+
+    expect(await readContinuingCandidates(filePath)).toEqual([{ ...legacy, vertical: '' }])
   })
 })
