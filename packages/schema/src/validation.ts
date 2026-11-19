@@ -2,6 +2,7 @@ import { z } from 'zod'
 
 import { PageArchetype } from './page.js'
 import type { NavItem } from './site.js'
+import { verticalIdSchema } from './vertical.js'
 
 // --- Block schemas ---
 
@@ -216,4 +217,5 @@ export const siteSchemaSchema = z.object({
   pages: z.array(pageSchemaSchema),
   footer: siteFooterInfoSchema.optional(),
   generator: siteGeneratorPreferencesSchema.optional(),
+  vertical: verticalIdSchema.optional(),
 })

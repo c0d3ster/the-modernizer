@@ -7,7 +7,7 @@ import type { SiteInspection } from '@modernizer/schema'
 import { pageFeatures } from '../inspect/test-fixtures.js'
 import { describeInspectionFacts } from './inspection-facts.js'
 import { visualScoreSystemPrompt } from './prompts/visual-score.js'
-import { DESIGN_RULES } from './rubric.js'
+import { DESIGN_RULES } from '@modernizer/design-guide'
 import { buildVisualScoreRequest, parseVisualScore, visualScoreInputFromInspection } from './visual-score.js'
 
 const inspection = (overrides: Partial<SiteInspection> = {}): SiteInspection => ({
@@ -62,7 +62,10 @@ const validScore = {
   overall: 3,
   pitch: 'yes',
   issues: ['cluttered', 'overlay'],
-  findings: [{ ruleId: 'header-stack', severity: 'major', where: 'both', evidence: 'Three header bars above the hero' }],
+  findings: [
+    { ruleId: 'header-bars', extent: 'full', count: 2, where: 'both', evidence: 'Three header bars above the hero' },
+    { ruleId: 'overlay-cookie-heavy', extent: 'partial', count: null, where: 'phone', evidence: 'Cookie banner covers a third of the phone screen' },
+  ],
   strengths: ['Real photos of the office'],
   cantJudge: ['Hover effects'],
   note: 'Three header bars push the hero down, and a cookie banner covers most of the phone screen.',
@@ -132,8 +135,14 @@ describe('buildVisualScoreRequest', () => {
 })
 
 describe('parseVisualScore', () => {
-  it('accepts a valid score', () => {
-    expect(parseVisualScore(validScore).overall).toBe(3)
+  it('accepts a valid score and computes points from the findings', () => {
+    const score = parseVisualScore(validScore)
+    expect(score.overall).toBe(3)
+    expect(score.deductions).toEqual([
+      { ruleId: 'header-bars', points: 10 },
+      { ruleId: 'overlay-cookie-heavy', points: 4 },
+    ])
+    expect(score.points).toBe(86)
   })
 
   it('rejects issue tags outside the bench vocabulary', () => {
@@ -141,7 +150,7 @@ describe('parseVisualScore', () => {
   })
 
   it('drops any rating on an unassessable site', () => {
-    expect(parseVisualScore({ ...validScore, unassessable: true })).toMatchObject({ overall: null, pitch: null })
+    expect(parseVisualScore({ ...validScore, unassessable: true })).toMatchObject({ overall: null, pitch: null, points: null, deductions: [] })
   })
 
   it('requires a rating on an assessable site', () => {

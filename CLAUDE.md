@@ -15,6 +15,7 @@ Phases 1-6 are complete. The pipeline runs end-to-end. Working on **Phase 7: Pol
 Three-stage pipeline: **Crawl > Extract > Generate**
 
 - `packages/schema` - Shared TypeScript types + Zod validation (the contract between all layers)
+- `packages/design-guide` - Design rules and per-vertical design profiles learned from the Site Rating Bench; drives the visual scorer's 100-point deductions and both generators' look (fonts, neutrals, hero, main action)
 - `packages/ui` - Component library: shadcn/ui primitives + block components (1:1 with ContentBlock types)
 - `packages/crawler` - Discovers and fetches all pages on a target site
 - `packages/extractor` - Converts raw HTML into structured page schemas using deterministic parsing + LLM classification

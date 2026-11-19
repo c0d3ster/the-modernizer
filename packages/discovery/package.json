@@ -20,6 +20,7 @@
     "vitest": "^4.1.2"
   },
   "dependencies": {
+    "@modernizer/design-guide": "workspace:*",
     "@anthropic-ai/sdk": "^0.82.0",
     "@modernizer/schema": "workspace:*",
     "cheerio": "^1.2.0",

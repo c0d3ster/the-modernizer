@@ -1,4 +1,5 @@
 import type { PageSchema } from './page.js'
+import type { VerticalId } from './vertical.js'
 
 export interface NavItem {
   label: string
@@ -45,4 +46,6 @@ export interface SiteSchema {
   footer?: SiteFooterInfo
   /** Codegen preferences (does not affect crawl/extract). */
   generator?: SiteGeneratorPreferences
+  /** What the business does; picks the generators' design profile. Detected when not set. */
+  vertical?: VerticalId
 }

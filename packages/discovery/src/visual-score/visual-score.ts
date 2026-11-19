@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises'
 import Anthropic from '@anthropic-ai/sdk'
-import { PITCH_VALUES, VISUAL_ISSUES, visualScoreSchema } from '@modernizer/schema'
+import { RUBRIC_VERSION, computeDesignPoints } from '@modernizer/design-guide'
+import { PITCH_VALUES, VISUAL_ISSUES, visualScoreModelSchema } from '@modernizer/schema'
 import type { SiteInspection, VisualScore } from '@modernizer/schema'
 
 import { describeInspectionFacts } from './inspection-facts.js'
@@ -78,10 +79,11 @@ export const VISUAL_SCORE_TOOL: Anthropic.Tool = {
         items: {
           type: 'object',
           additionalProperties: false,
-          required: ['ruleId', 'severity', 'where', 'evidence'],
+          required: ['ruleId', 'extent', 'count', 'where', 'evidence'],
           properties: {
             ruleId: { type: 'string', description: 'Id of the rule this breaks, or "other"' },
-            severity: { type: 'string', enum: ['major', 'minor'] },
+            extent: { type: 'string', enum: ['full', 'partial'], description: 'partial when the problem is only partly there' },
+            count: nullable({ type: 'integer', description: 'Units for counted rules (header bars), otherwise null' }),
             where: { type: 'string', enum: ['laptop', 'phone', 'both', 'small laptop'] },
             evidence: { type: 'string', description: 'What the screenshot or measurement shows' },
           },
@@ -121,12 +123,16 @@ export const buildVisualScoreRequest = async (
   messages: [{ role: 'user', content: [...(await imageBlocks(images)), { type: 'text', text: visualScoreUserText(facts) }] }],
 })
 
-/** Validates the tool input and keeps it consistent: no rating on an unassessable site. */
+/**
+ * Validates the tool input, keeps it consistent (no rating on an unassessable site) and computes the
+ * 100-point score from the findings with the rubric's point values.
+ */
 export const parseVisualScore = (toolInput: unknown): VisualScore => {
-  const score = visualScoreSchema.parse(toolInput)
-  if (score.unassessable) return { ...score, overall: null, pitch: null }
-  if (score.overall === null) throw new Error('visual score is missing a rating for an assessable site')
-  return score
+  const output = visualScoreModelSchema.parse(toolInput)
+  if (output.unassessable) return { ...output, overall: null, pitch: null, points: null, deductions: [], rubric: RUBRIC_VERSION }
+  if (output.overall === null) throw new Error('visual score is missing a rating for an assessable site')
+  const { score, deductions } = computeDesignPoints(output.findings)
+  return { ...output, points: score, deductions, rubric: RUBRIC_VERSION }
 }
 
 /** Rates a site's visual design from screenshots and measured facts, using the rubric learned from hand ratings. */

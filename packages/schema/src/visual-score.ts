@@ -22,13 +22,17 @@ export type Pitch = z.infer<typeof pitchSchema>
 export const visualFindingSchema = z.object({
   // A rubric rule id, or "other" for a problem the rules don't name
   ruleId: z.string().min(1),
-  severity: z.enum(['major', 'minor']),
+  // partial when the problem is only partly there (a small popup, a slight sideways scroll)
+  extent: z.enum(['full', 'partial']),
+  // For counted rules (header bars): how many units. Null for everything else.
+  count: z.number().int().min(0).nullable(),
   where: z.enum(['laptop', 'phone', 'both', 'small laptop']),
   // What the screenshot shows, in plain words a business owner would follow
   evidence: z.string().min(1),
 })
 
-export const visualScoreSchema = z.object({
+// What the model returns. Points are computed from the findings in code, never by the model.
+export const visualScoreModelSchema = z.object({
   // The screenshots don't show the site (a bot check, an error page, a blank page)
   unassessable: z.boolean(),
   overall: z.number().int().min(1).max(5).nullable(),
@@ -42,5 +46,15 @@ export const visualScoreSchema = z.object({
   note: z.string(),
 })
 
+export const deductionSchema = z.object({ ruleId: z.string(), points: z.number().int().min(0) })
+
+export const visualScoreSchema = visualScoreModelSchema.extend({
+  // 0-100: starts at 100, minus the rubric's points for each problem found (each rule once)
+  points: z.number().int().min(0).max(100).nullable(),
+  deductions: z.array(deductionSchema),
+  rubric: z.string(),
+})
+
 export type VisualFinding = z.infer<typeof visualFindingSchema>
+export type VisualScoreModelOutput = z.infer<typeof visualScoreModelSchema>
 export type VisualScore = z.infer<typeof visualScoreSchema>
