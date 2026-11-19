@@ -27,7 +27,19 @@ const mergeHeroes = (a: HeroBlock, b: HeroBlock): HeroBlock => {
   return { ...main, ...(backgroundImageUrl && { backgroundImageUrl }) }
 }
 
-export const tidyHomeBlocks = (blocks: readonly ContentBlock[], heroImageUrl?: string): ContentBlock[] => {
+/** "Brand - Certified Master Plumber - Winchester, VA - Berryville, VA": a page title, not a heading. */
+const SEO_SEPARATOR = /\s[-–|]\s/
+export const isSeoTitle = (heading: string): boolean => heading.split(SEO_SEPARATOR).length >= 3
+
+/** A section heading that is really the page's SEO title is cut to its first part (usually the name). */
+const withoutSeoHeadings = (blocks: readonly ContentBlock[]): ContentBlock[] =>
+  blocks.map((b) => {
+    if (b.type === 'hero' || !('heading' in b) || typeof b.heading !== 'string' || !isSeoTitle(b.heading)) return b
+    return { ...b, heading: b.heading.split(SEO_SEPARATOR)[0]?.trim() ?? b.heading }
+  })
+
+export const tidyHomeBlocks = (input: readonly ContentBlock[], heroImageUrl?: string): ContentBlock[] => {
+  const blocks = withoutSeoHeadings(input)
   const heroAt = blocks.findIndex((b) => b.type === 'hero')
   if (heroAt === -1 || heroAt > 2) return [...blocks]
   const firstHero = blocks[heroAt]

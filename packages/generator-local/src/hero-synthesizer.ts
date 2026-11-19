@@ -111,7 +111,9 @@ export const synthesizeHero = (schema: SiteSchema, action?: SiteAction | null): 
     const filled: HeroBlock = {
       ...first,
       backgroundImageUrl: first.backgroundImageUrl ?? extractedBg,
-      ...(!first.ctaText && action ? { ctaText: action.text, ctaUrl: action.url } : {}),
+      // A hero whose only button dials the phone gets the main action instead; the call button is
+      // added beside it, so the hero never shows the same number twice
+      ...((!first.ctaText || first.ctaUrl?.startsWith('tel:')) && action && !action.url.startsWith('tel:') ? { ctaText: action.text, ctaUrl: action.url } : {}),
     }
     const pages = [...schema.pages]
     pages[homeIndex] = { ...home, blocks: [filled, ...home.blocks.slice(1)] }

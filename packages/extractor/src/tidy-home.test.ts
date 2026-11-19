@@ -35,3 +35,16 @@ describe('tidyHomeBlocks', () => {
     expect(tidyHomeBlocks([notice, hero])).toEqual([hero, notice])
   })
 })
+
+describe('tidyHomeBlocks SEO headings', () => {
+  it('cuts a section heading that is the page SEO title down to its first part', () => {
+    const blocks: ContentBlock[] = [
+      { type: 'hero', heading: 'Fast plumbing' },
+      { type: 'image_gallery', heading: 'Brant Plumbing - Certified Master Plumber - Winchester, VA - Berryville, VA', images: [] },
+      { type: 'text_section', heading: 'Areas - we serve', body: 'Two parts is a normal heading.' },
+    ]
+    const [, gallery, text] = tidyHomeBlocks(blocks)
+    expect(gallery).toMatchObject({ heading: 'Brant Plumbing' })
+    expect(text).toMatchObject({ heading: 'Areas - we serve' })
+  })
+})

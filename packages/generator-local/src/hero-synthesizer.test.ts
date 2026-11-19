@@ -50,3 +50,12 @@ describe('synthesizeHero', () => {
     expect(hero?.type === 'hero' && hero.backgroundImageUrl).toBe('https://example.com/team.jpg')
   })
 })
+
+describe('synthesizeHero main action', () => {
+  it('replaces a call-only hero button with the main action', () => {
+    const base = site()
+    const schema: SiteSchema = { ...base, pages: [{ ...base.pages[0]!, blocks: [{ type: 'hero', heading: 'Fast plumbing', ctaText: 'Call now! 304 268 9533', ctaUrl: 'tel:13042689533' }] }] }
+    const hero = synthesizeHero(schema, { text: 'Schedule service', url: '/book-online' }).pages[0]!.blocks[0]
+    expect(hero).toMatchObject({ ctaText: 'Schedule service', ctaUrl: '/book-online' })
+  })
+})
