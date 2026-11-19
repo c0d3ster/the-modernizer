@@ -154,6 +154,8 @@ export const viewInspectionSchema = z.object({
   features: pageFeaturesSchema.nullable(),
   covered: z.array(coverageItemSchema),
   screenshots: z.array(screenshotSchema),
+  // Measured after scrolling one screen: a header with links still pinned to the top
+  headerSticks: z.boolean().optional(),
   error: z.string().optional(),
 })
 

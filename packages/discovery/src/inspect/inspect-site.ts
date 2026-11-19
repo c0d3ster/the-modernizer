@@ -6,6 +6,7 @@ import type { CoverageItem, PageFeatures, Screenshot, SiteInspection, ViewInspec
 import { detectCoverage } from './browser/detect-coverage.js'
 import { detectFeatures } from './browser/detect-features.js'
 import { measureHeaderBands } from './browser/measure-header.js'
+import { headerSticks } from './browser/header-sticks.js'
 import { dismissConsent, scrollOneScreen, visibleText, warmUp } from './browser/page-actions.js'
 import { coverageNotes, coversDesign } from './coverage.js'
 import { detectProjectFeatures } from './project-features.js'
@@ -130,6 +131,7 @@ const inspectView = async (url: string, vp: InspectionViewport, options: Inspect
     if (vp.topOnly) return { view, finalUrl, blocked }
     await page.evaluate(scrollOneScreen)
     await page.waitForTimeout(1500)
+    view.headerSticks = await page.evaluate(headerSticks).catch(() => undefined)
     await shot('scrolled')
   } catch (err) {
     view.error = errorMessage(err)

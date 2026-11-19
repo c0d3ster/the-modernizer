@@ -37,6 +37,8 @@ export interface VisualScoreInput {
   facts: string
   // Bars beyond the main header, measured on the laptop view; caps the header-bars finding
   extraHeaderBars?: number | null
+  // Whether the laptop header stays pinned after scrolling; a pinned header can't be charged as not sticky
+  headerSticks?: boolean
 }
 
 export interface VisualScoreResult {
@@ -76,7 +78,13 @@ export const visualScoreInputFromInspection = (inspection: SiteInspection): Visu
   })
   const bands = inspection.views.find((v) => v.viewport === 'desktop')?.features?.headerBands
   const extraHeaderBars = bands ? summarizeHeaderBars(bands)?.extra : undefined
-  return { images, facts: describeInspectionFacts(inspection), ...(extraHeaderBars !== undefined && { extraHeaderBars }) }
+  const headerSticks = inspection.views.find((v) => v.viewport === 'desktop')?.headerSticks
+  return {
+    images,
+    facts: describeInspectionFacts(inspection),
+    ...(extraHeaderBars !== undefined && { extraHeaderBars }),
+    ...(headerSticks !== undefined && { headerSticks }),
+  }
 }
 
 const nullable = (schema: Record<string, unknown>): Record<string, unknown> => ({ anyOf: [schema, { type: 'null' }] })
@@ -180,11 +188,12 @@ export const buildVerifyRequest = (
  */
 export const parseVisualScore = (
   toolInput: unknown,
-  { extraHeaderBars, checks }: Pick<VisualScoreInput, 'extraHeaderBars'> & { checks?: readonly FindingCheck[] } = {}
+  { extraHeaderBars, headerSticks, checks }: Pick<VisualScoreInput, 'extraHeaderBars' | 'headerSticks'> & { checks?: readonly FindingCheck[] } = {}
 ): VisualScore => {
   const parsed = visualScoreModelSchema.parse(toolInput)
   const checked = checks ? applyFindingChecks(parsed.findings, checks) : parsed.findings
-  const output = { ...parsed, findings: capHeaderBarFindings(checked, extraHeaderBars) }
+  const measured = capHeaderBarFindings(checked, extraHeaderBars).filter((f) => !(headerSticks === true && f.ruleId === 'header-not-sticky'))
+  const output = { ...parsed, findings: measured }
   const record = checks ? { checks: checks.map((c) => ({ ...c, ruleId: parsed.findings[c.index]?.ruleId ?? 'unknown' })) } : {}
   if (output.unassessable) return { ...output, overall: null, pitch: null, points: null, deductions: [], rubric: RUBRIC_VERSION, ...record }
   if (output.overall === null) throw new Error('visual score is missing a rating for an assessable site')

@@ -34,6 +34,10 @@ export const describeInspectionFacts = (inspection: SiteInspection): string => {
     if (view.viewport === 'small' || !view.features) continue
     lines.push(...viewFacts(VIEW_LABELS[view.viewport], view.features))
   }
+  for (const view of inspection.views) {
+    if (view.viewport === 'small' || view.headerSticks === undefined) continue
+    lines.push(`${VIEW_LABELS[view.viewport]} header after scrolling one screen: ${view.headerSticks ? 'stays pinned to the top (sticky)' : 'scrolls away with the page'}`)
+  }
   const laptop = inspection.views.find((v) => v.viewport === 'desktop')?.features
   const bars = laptop?.headerBands ? summarizeHeaderBars(laptop.headerBands) : null
   if (bars) lines.push(describeHeaderBars('Laptop', bars))
