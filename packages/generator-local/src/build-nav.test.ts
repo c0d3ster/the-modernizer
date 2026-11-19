@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildNav, navSource } from './layout-generator.js'
+import { buildNav, navLabelFor, navSource, visibleNavCount } from './layout-generator.js'
 import { PageArchetype } from '@modernizer/schema'
 import type { NavItem, SiteSchema } from '@modernizer/schema'
 
@@ -130,14 +130,45 @@ describe('navSource', () => {
 
   it('uses the extracted menu when there is one', () => {
     const nav = [{ label: 'About', url: '/about' }]
-    expect(navSource({ nav, pages: [], rootUrl: 'https://example.com/' })).toBe(nav)
+    expect(navSource({ nav, pages: [], rootUrl: 'https://example.com/', siteName: 'Amos Family Dentistry' })).toBe(nav)
   })
 
   it('builds a menu from the crawled pages when extraction found none', () => {
     const pages = [page('https://example.com/', 'Home'), page('https://example.com/about', 'About Dr. Amos | Amos Family Dentistry'), page('https://example.com/services', 'Services – Amos Family Dentistry')]
-    expect(navSource({ nav: [], pages, rootUrl: 'https://example.com/' })).toEqual([
+    expect(navSource({ nav: [], pages, rootUrl: 'https://example.com/', siteName: 'Amos Family Dentistry' })).toEqual([
       { label: 'About Dr. Amos', url: 'https://example.com/about' },
       { label: 'Services', url: 'https://example.com/services' },
     ])
+  })
+
+  it('drops the business name and falls back to the URL slug for long SEO titles', () => {
+    expect(navLabelFor('Urgent Care - MEADOW BRANCH ANIMAL HOSPITAL', '/urgent-care.html', 'Meadow Branch Animal Hospital')).toBe('Urgent Care')
+    expect(navLabelFor('MEADOW BRANCH ANIMAL HOSPITAL - Meadow Branch Animal Hospital Announcements & Blog', '/blog.html', 'Meadow Branch Animal Hospital')).toBe('Blog')
+    expect(navLabelFor('Professional Frame Repair Services in Winchester, VA', '/frame-repair', "Robbie's Auto Body")).toBe('Frame Repair')
+    expect(navLabelFor('Winchester Car Accident Attorney', '/car-accident-lawyer', 'Correll Law Firm')).toBe('Car Accident Lawyer')
+  })
+})
+
+describe('fallback menu cleanup', () => {
+  const page = (url: string, title: string): SiteSchema['pages'][number] => ({ url, title, archetype: PageArchetype.Generic, blocks: [] })
+
+  it('drops shared edge words, shortens labels and leaves out legal pages', () => {
+    const pages = [
+      page('https://law.example/', 'Home'),
+      page('https://law.example/winchester-medical-malpractice-attorney', 'Winchester Medical Malpractice Attorney'),
+      page('https://law.example/winchester-car-accident-lawyer', 'Winchester Car Accident Lawyer'),
+      page('https://law.example/winchester-pedestrian-accident-attorney', 'Winchester Pedestrian Accident Attorney'),
+      page('https://law.example/tou-and-privacy', 'TOU and Privacy'),
+    ]
+    expect(navSource({ nav: [], pages, rootUrl: 'https://law.example/', siteName: 'Correll Law Firm' }).map((n) => n.label)).toEqual([
+      'Medical Malpractice',
+      'Car Accident Lawyer',
+      'Pedestrian Accident',
+    ])
+  })
+
+  it('shows only as many links as fit the bar', () => {
+    expect(visibleNavCount(['About', 'Services', 'Reviews', 'Contact'])).toBe(4)
+    expect(visibleNavCount(['Frame Repair Specialist', 'Auto Body Paint Experts', 'Aluminum Auto Body Repair', 'Windshield And Glass'])).toBe(2)
   })
 })
