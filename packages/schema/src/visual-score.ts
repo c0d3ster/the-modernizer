@@ -48,13 +48,25 @@ export const visualScoreModelSchema = z.object({
 
 export const deductionSchema = z.object({ ruleId: z.string(), points: z.number().int().min(0) })
 
+// The second look at each finding: kept, softened to partial, or dropped because an exception applies
+export const findingCheckSchema = z.object({
+  index: z.number().int().min(0),
+  verdict: z.enum(['keep', 'partial', 'drop']),
+  // Corrected unit count for counted rules, otherwise null
+  count: z.number().int().min(0).nullable(),
+  reason: z.string(),
+})
+
 export const visualScoreSchema = visualScoreModelSchema.extend({
   // 0-100: starts at 100, minus the rubric's points for each problem found (each rule once)
   points: z.number().int().min(0).max(100).nullable(),
   deductions: z.array(deductionSchema),
   rubric: z.string(),
+  // Present when the findings were checked a second time; findings above are the checked ones
+  checks: z.array(findingCheckSchema.extend({ ruleId: z.string() })).optional(),
 })
 
 export type VisualFinding = z.infer<typeof visualFindingSchema>
 export type VisualScoreModelOutput = z.infer<typeof visualScoreModelSchema>
 export type VisualScore = z.infer<typeof visualScoreSchema>
+export type FindingCheck = z.infer<typeof findingCheckSchema>

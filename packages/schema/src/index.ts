@@ -102,13 +102,14 @@ export {
   PITCH_VALUES,
   VISUAL_ISSUES,
   deductionSchema,
+  findingCheckSchema,
   pitchSchema,
   visualFindingSchema,
   visualIssueSchema,
   visualScoreModelSchema,
   visualScoreSchema,
 } from './visual-score.js'
-export type { Pitch, VisualFinding, VisualIssue, VisualScore, VisualScoreModelOutput } from './visual-score.js'
+export type { FindingCheck, Pitch, VisualFinding, VisualIssue, VisualScore, VisualScoreModelOutput } from './visual-score.js'
 
 export { VERTICAL_IDS } from './vertical.js'
 export { verticalIdSchema } from './validation.js'

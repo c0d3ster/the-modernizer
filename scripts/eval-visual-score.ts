@@ -39,6 +39,7 @@ interface Options {
   thinking: 'off' | 'adaptive'
   model: (typeof VISUAL_SCORE_MODELS)[number]
   concurrency: number
+  verify: boolean
 }
 
 const readDone = async (progressPath: string): Promise<Map<string, SiteResult>> => {
@@ -62,7 +63,7 @@ const run = async (evalPath: string, options: Options): Promise<void> => {
   const worker = async (): Promise<void> => {
     for (const item of queue) {
       try {
-        const { score, usage } = await scoreSiteVisually(visualScoreInputFromInspection(item.inspection), { effort: options.effort, thinking: options.thinking, model: options.model })
+        const { score, usage } = await scoreSiteVisually(visualScoreInputFromInspection(item.inspection), { effort: options.effort, thinking: options.thinking, model: options.model, verify: options.verify })
         const result: SiteResult = { siteId: item.siteId, score, costUsd: usage.estimatedCostUsd }
         done.set(item.siteId, result)
         await appendFile(progressPath, `${JSON.stringify(result)}\n`)
@@ -85,7 +86,7 @@ const run = async (evalPath: string, options: Options): Promise<void> => {
   const cost = scored.reduce((sum, s) => sum + s.costUsd, 0)
   await writeFile(
     options.out,
-    JSON.stringify({ rubric: RUBRIC_VERSION, model: options.model, effort: options.effort, thinking: options.thinking, report, costUsd: cost, sites: scored.map(({ item, score }) => ({ name: item.name, human: item.human, model: score })) }, null, 1)
+    JSON.stringify({ rubric: RUBRIC_VERSION, model: options.model, effort: options.effort, thinking: options.thinking, verify: options.verify, report, costUsd: cost, sites: scored.map(({ item, score }) => ({ name: item.name, human: item.human, model: score })) }, null, 1)
   )
 
   const pct = (x: number): string => `${Math.round(x * 100)}%`
@@ -119,11 +120,12 @@ const main = async (): Promise<void> => {
     .option('--thinking <mode>', 'off or adaptive', 'adaptive')
     .option('--model <id>', `scoring model: ${VISUAL_SCORE_MODELS.join(' or ')}`, 'claude-sonnet-5')
     .option('--concurrency <n>', 'parallel requests', (v) => Number(v), 4)
+    .option('--no-verify', 'skip the follow-up check of each finding against its rule exceptions')
     .parse()
   const [evalPath] = program.args
   const raw = program.opts<Record<string, unknown>>()
   const options = z
-    .object({ out: z.string(), limit: z.number().int().positive().optional(), only: z.string().optional(), effort: z.enum(['low', 'medium', 'high']), thinking: z.enum(['off', 'adaptive']), model: z.enum(VISUAL_SCORE_MODELS), concurrency: z.number().int().positive() })
+    .object({ out: z.string(), limit: z.number().int().positive().optional(), only: z.string().optional(), effort: z.enum(['low', 'medium', 'high']), thinking: z.enum(['off', 'adaptive']), model: z.enum(VISUAL_SCORE_MODELS), concurrency: z.number().int().positive(), verify: z.boolean() })
     .parse(raw)
   if (!evalPath) throw new Error('eval set path is required')
   await run(evalPath, options)
