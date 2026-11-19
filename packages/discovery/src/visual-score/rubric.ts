@@ -356,6 +356,8 @@ export const SCORE_LEVELS: Readonly<Record<1 | 2 | 3 | 4 | 5, string>> = {
 
 // How the rater actually used the scale, beyond the level descriptions above.
 export const CALIBRATION_NOTES: readonly string[] = [
+  'Decide from the overall impression first: does the site look clean, cohesive and current, with real imagery and a clear action? Then use findings to explain the rating. Major problems move the rating; minor ones explain it but do not pull a site down a level by themselves, however many there are.',
+  'The designer gives 5s readily, to about one site in six. "Agency-level" means a visitor would see nothing worth fixing, not perfection or a custom build. Do not withhold a 5 because of minor findings.',
   'A 5 has nothing worth fixing: cohesive color, real imagery, readable type, a clear call to action and a header that stays out of the way. It can be simple.',
   'A 4 is clean and current with one or two specific, fixable problems (a cut-off second section, low-contrast buttons, a crowded spot on mobile). A site that is cheesy but has every piece of information in the right place still earns a 4.',
   'A 3 has several structural problems, usually in the header and first screen (three header bars, a popup on load, a hidden call to action, dead space), even if parts look modern.',

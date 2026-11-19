@@ -86,6 +86,7 @@ describe('describeInspectionFacts', () => {
     const facts = describeInspectionFacts(inspection())
     expect(facts).toContain('Laptop menu: 2 links in the first screen (Home, About)')
     expect(facts).toContain('"Book now" (starts a phone call)')
+    expect(facts).not.toContain('plain text')
     expect(facts).toContain('Phone page scrolls sideways by 140px')
     expect(facts).toContain('Phone: Cookie banner covers 72% of the first screen (bottom)')
     expect(facts).toContain('Reviews & Testimonials (Elfsight widget)')

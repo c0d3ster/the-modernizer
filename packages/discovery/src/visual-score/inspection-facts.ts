@@ -6,8 +6,9 @@ const viewFacts = (label: string, f: PageFeatures): string[] => {
   const lines = [
     `${label} menu: ${f.menuLinks.length ? `${f.menuLinks.length} links in the first screen (${f.menuLinks.join(', ')})` : 'no menu links in the first screen'}${f.menuButton ? ', plus a menu button' : ''}`,
     `${label} buttons in the first screen: ${f.ctas.length ? f.ctas.map((c) => `"${c.text}" (${c.goesTo})`).join('; ') : 'none found'}`,
-    `${label} tap-to-call link in the first screen: ${f.telInFold ? 'yes' : 'no'}${!f.telLinks && f.phoneInText ? ' (a phone number appears only as plain text)' : ''}`,
   ]
+  // Only worth saying when it shows: a number on screen that can't be tapped
+  if (!f.telLinks && f.phoneInText) lines.push(`${label} phone number appears only as plain text, with no tap-to-call link anywhere on the page`)
   if (f.heroVideo) lines.push(`${label} hero is a video (screenshots show one frame)`)
   if (f.overflowPx > 20) lines.push(`${label} page scrolls sideways by ${f.overflowPx >= 600 ? '600px or more' : `${f.overflowPx}px`}`)
   return lines
