@@ -105,5 +105,6 @@ export {
 } from './visual-score.js'
 export type { Pitch, VisualFinding, VisualIssue, VisualScore, VisualScoreModelOutput } from './visual-score.js'
 
-export { VERTICAL_IDS, verticalIdSchema } from './vertical.js'
+export { VERTICAL_IDS } from './vertical.js'
+export { verticalIdSchema } from './validation.js'
 export type { VerticalId } from './vertical.js'

@@ -22,7 +22,7 @@ interface NavbarProps {
 /** "(540) 555-0100" -> "tel:5405550100" */
 export const telHref = (phone: string): string => `tel:${phone.replace(/[^\d+]/g, '')}`
 
-const linkClass = 'text-sm font-medium text-foreground/80 transition-colors hover:text-foreground'
+const linkClass = 'whitespace-nowrap text-sm font-medium text-foreground/80 transition-colors hover:text-foreground'
 
 const DesktopItem = ({ item }: { item: NavItem }): React.ReactElement => {
   const children = item.children ?? []
@@ -104,11 +104,11 @@ export const Navbar = ({ siteName, nav, ctaText, ctaUrl, phone, maxVisible = 6 }
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/85">
       <div className={cn(container, 'flex h-16 items-center justify-between gap-6 lg:h-20')}>
-        <Link href="/" className="font-heading text-lg font-bold tracking-tight text-foreground lg:text-xl">
+        <Link href="/" className="min-w-0 truncate font-heading text-lg font-bold tracking-tight text-foreground lg:max-w-[16rem] lg:text-xl xl:max-w-none">
           {siteName}
         </Link>
 
-        <nav className="hidden items-center gap-7 lg:flex" aria-label="Main">
+        <nav className="hidden items-center gap-5 lg:flex xl:gap-7" aria-label="Main">
           {visible.map((item) => (
             <DesktopItem key={item.url + item.label} item={item} />
           ))}

@@ -5,7 +5,7 @@ import type { SiteSchema } from '@modernizer/schema'
 import { urlToRoutePath, urlToComponentName } from './route-mapper.js'
 import { copyComponents } from './component-copier.js'
 import { generatePage } from './page-generator.js'
-import { generateLayout, generateGlobalsCss, buildNav } from './layout-generator.js'
+import { generateLayout, generateGlobalsCss, buildNav, navSource } from './layout-generator.js'
 import { generateReport } from './report-generator.js'
 import { placeBlocks } from './block-placer.js'
 import { synthesizeHero, synthesizePageHeaders } from './hero-synthesizer.js'
@@ -60,7 +60,7 @@ export const generateSite = async (schema: SiteSchema, outputDir: string): Promi
       }
     })
   )
-  const nav = buildNav(schema.nav, base, pagePathnames, navMaxItems)
+  const nav = buildNav(navSource(schema), base, pagePathnames, navMaxItems)
 
   await Promise.all([
     writeFile(join(outputDir, 'package.json'), generatePackageJson(schema)),

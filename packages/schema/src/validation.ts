@@ -2,7 +2,7 @@ import { z } from 'zod'
 
 import { PageArchetype } from './page.js'
 import type { NavItem } from './site.js'
-import { verticalIdSchema } from './vertical.js'
+import { VERTICAL_IDS } from './vertical.js'
 
 // --- Block schemas ---
 
@@ -205,6 +205,8 @@ export const siteFooterInfoSchema = z.object({
 export const siteGeneratorPreferencesSchema = z.object({
   navMaxItems: z.number().int().min(1).max(50).optional(),
 })
+
+export const verticalIdSchema = z.enum(VERTICAL_IDS)
 
 export const siteSchemaSchema = z.object({
   rootUrl: z.string(),
