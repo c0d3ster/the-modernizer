@@ -7,12 +7,13 @@ import { existsSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
 
 import { Command } from 'commander'
-import { RUBRIC_VERSION, scoreSiteVisually, visualScoreInputFromInspection } from '@modernizer/discovery'
+import { RUBRIC_VERSION } from '@modernizer/design-guide'
+import { scoreSiteVisually, visualScoreInputFromInspection } from '@modernizer/discovery'
 import { siteInspectionSchema, visualScoreSchema } from '@modernizer/schema'
 import type { VisualScore } from '@modernizer/schema'
 import { z } from 'zod'
 
-import { agreement } from './visual-eval-metrics.js'
+import { agreement, spearman } from './visual-eval-metrics.js'
 
 const evalSetSchema = z.object({
   items: z.array(
@@ -90,6 +91,14 @@ const run = async (evalPath: string, options: Options): Promise<void> => {
   console.log(`\n${report.count} sites rated by both (${scored.length - pairs.length} the model could not assess)`)
   console.log(`mean abs error ${report.meanAbsoluteError.toFixed(2)}, bias ${report.meanBias >= 0 ? '+' : ''}${report.meanBias.toFixed(2)}, exact ${pct(report.exactRate)}, within one ${pct(report.withinOneRate)}, spearman ${report.spearman.toFixed(2)}`)
   console.log(`pitch agreement ${pct(report.pitchAgreementRate)}, issue tags precision ${pct(report.issuePrecision)} recall ${pct(report.issueRecall)}`)
+  // The 100-point score against the hand ratings: rank agreement, and the spread for each rating
+  const withPoints = scored.flatMap(({ item, score }) => (score.points === null ? [] : [{ human: item.human.overall, points: score.points }]))
+  const pointsSpearman = spearman(withPoints.map((p) => p.human), withPoints.map((p) => p.points))
+  console.log(`\n100-point score: spearman ${pointsSpearman.toFixed(2)} against the hand ratings`)
+  for (const rating of [1, 2, 3, 4, 5]) {
+    const points = withPoints.filter((p) => p.human === rating).map((p) => p.points).sort((a, b) => a - b)
+    if (points.length) console.log(`  rated ${rating}: median ${points[Math.floor(points.length / 2)]}, range ${points[0]}-${points.at(-1)} (${points.length} sites)`)
+  }
   console.log('\nconfusion (rows human 1-5, columns model 1-5)')
   report.confusion.forEach((row, i) => console.log(`  ${i + 1}: ${row.map((n) => pad(n, 3)).join('')}`))
   console.log('\nlargest disagreements')
