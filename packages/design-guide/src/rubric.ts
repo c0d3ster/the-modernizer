@@ -12,7 +12,7 @@
 // A fixed rule takes `points` in full, or `partial` when the problem is only partly there. A counted
 // rule takes `points` per unit, up to `max`.
 
-export const RUBRIC_VERSION = 'v4'
+export const RUBRIC_VERSION = 'v5'
 
 export const RULE_AREAS = ['header', 'navigation', 'first-screen', 'overlays', 'typography', 'color', 'imagery', 'mobile', 'cta', 'consistency'] as const
 export type RuleArea = (typeof RULE_AREAS)[number]
@@ -308,7 +308,7 @@ export const DESIGN_RULES: readonly DesignRule[] = [
     id: 'mobile-little-info',
     area: 'mobile',
     scoring: fixed(5, 3),
-    rule: 'A phone first screen with almost no information, often from a split desktop layout stacked badly. A menu button in place of the links is normal and does not count.',
+    rule: 'A phone first screen that does not say who the business is or what it does, often from a split desktop layout stacked badly (a blank box, a cropped image with no headline). A menu button in place of the links is normal and is never the problem; neither is a photo with a headline and a button, which is enough.',
   },
   {
     kind: 'avoid',
@@ -323,7 +323,7 @@ export const DESIGN_RULES: readonly DesignRule[] = [
     id: 'cta-missing',
     area: 'cta',
     scoring: fixed(15, 8),
-    rule: 'No clear main action (call, book, order, get a quote) anywhere in the first screen, or one hidden behind a large logo or header. A visible phone link or booking button in the header counts as an action.',
+    rule: 'No clear main action (call, book, order, get a quote) anywhere in the first screen, or one hidden behind a large logo or header. A visible phone link or booking button in the header counts as an action, and so does any clear button that moves a visitor toward becoming a customer (shop, find a location, claim an offer, request a case review), even when it opens another site.',
   },
   {
     kind: 'avoid',
