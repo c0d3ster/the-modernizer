@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   deduplicateUrls,
   isAssetUrl,
+  isInfrastructureUrl,
   isNavigableUrl,
   isSameDomain,
   normalizeUrl,
@@ -212,5 +213,20 @@ describe('deduplicateUrls', () => {
       'https://EXAMPLE.COM/about',
     ]
     expect(deduplicateUrls(urls)).toHaveLength(1)
+  })
+})
+
+describe('isInfrastructureUrl', () => {
+  it('skips platform paths that are never content pages, but keeps plugin pages', () => {
+    expect(isInfrastructureUrl('https://example.com/cdn-cgi/l/email-protection')).toBe(true)
+    expect(isInfrastructureUrl('https://example.com/wp-content/plugins/menu-x/pwa/mobile/')).toBe(false)
+    expect(isInfrastructureUrl('https://example.com/wp-json/wp/v2/pages')).toBe(true)
+    expect(isInfrastructureUrl('https://example.com/blog/feed/')).toBe(true)
+  })
+
+  it('keeps real pages', () => {
+    expect(isInfrastructureUrl('https://example.com/menu')).toBe(false)
+    expect(isInfrastructureUrl('https://example.com/wp-tips-for-owners')).toBe(false)
+    expect(isNavigableUrl('https://example.com/cdn-cgi/l/email-protection', 'https://example.com/')).toBe(false)
   })
 })

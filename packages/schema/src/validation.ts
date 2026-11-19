@@ -208,6 +208,16 @@ export const siteGeneratorPreferencesSchema = z.object({
 
 export const verticalIdSchema = z.enum(VERTICAL_IDS)
 
+export const siteImageSchema = z.object({
+  url: z.string(),
+  alt: z.string().optional(),
+  width: z.number().positive().optional(),
+  height: z.number().positive().optional(),
+  kind: z.enum(['logo', 'icon', 'photo']),
+  pageUrl: z.string(),
+  order: z.number().int().nonnegative(),
+})
+
 export const siteSchemaSchema = z.object({
   rootUrl: z.string(),
   siteName: z.string(),
@@ -215,6 +225,8 @@ export const siteSchemaSchema = z.object({
   brandColors: brandColorsSchema,
   faviconUrl: z.string().optional(),
   logoUrl: z.string().optional(),
+  heroImageUrl: z.string().optional(),
+  images: z.array(siteImageSchema).optional(),
   nav: z.array(navItemSchema),
   pages: z.array(pageSchemaSchema),
   footer: siteFooterInfoSchema.optional(),

@@ -56,9 +56,10 @@ export const stripChrome = (pages: Array<{ url: string; rawHtml: string }>): Str
     })
   }
 
+  // "Shared across pages" means nothing for a one-page site: every element would count
   const chromeHashes = new Set<string>()
   for (const [hash, count] of hashCounts) {
-    if (count / pages.length >= CHROME_THRESHOLD) {
+    if (count >= 2 && count / pages.length >= CHROME_THRESHOLD) {
       chromeHashes.add(hash)
     }
   }

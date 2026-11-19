@@ -76,6 +76,20 @@ export const pageSeoSchema = z.object({
   canonical: z.boolean(),
 })
 
+// One horizontal band of the header area as measured in the browser: a run of rows with the same
+// background, from the top of the page down to where the hero or content starts.
+export const headerBandSchema = z.object({
+  top: z.number(),
+  height: z.number(),
+  // '#rrggbb', 'image' for a photo or gradient, or 'transparent' (over the hero)
+  background: z.string(),
+  links: z.number().int().nonnegative(),
+  phone: z.boolean(),
+  logo: z.boolean(),
+  // What the band says, shortened
+  text: z.string(),
+})
+
 // What the in-page detector reports for one viewport. Heuristic by nature: vendor names come from
 // links, scripts and iframes, never loose page text.
 export const pageFeaturesSchema = z.object({
@@ -109,6 +123,8 @@ export const pageFeaturesSchema = z.object({
   screens: z.number().nonnegative(),
   // How far a visitor can actually scroll sideways (capped at 600)
   overflowPx: z.number().nonnegative(),
+  // Measured header bands, top to bottom (absent in inspections saved before it was measured)
+  headerBands: z.array(headerBandSchema).optional(),
 })
 
 export const COVERAGE_KINDS = ['cookie banner', 'popup', 'header', 'floating'] as const
@@ -169,6 +185,7 @@ export const siteInspectionSchema = z.object({
 
 export type PageCta = z.infer<typeof pageCtaSchema>
 export type PageFeatures = z.infer<typeof pageFeaturesSchema>
+export type HeaderBand = z.infer<typeof headerBandSchema>
 export type CoverageItem = z.infer<typeof coverageItemSchema>
 export type CoverageKind = CoverageItem['kind']
 export type Screenshot = z.infer<typeof screenshotSchema>

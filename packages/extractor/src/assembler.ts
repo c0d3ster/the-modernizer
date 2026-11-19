@@ -9,11 +9,17 @@ import { splitBlocks } from './block-splitter.js'
 import { classifyBlocks } from './block-classifier.js'
 import { extractSiteData } from './site-extractor.js'
 import { extractCandidateColors } from './color-extractor.js'
+import type { ColorCandidate } from './color-extractor.js'
 import { fetchLinkedCss } from './css-fetcher.js'
+import { imageInventory } from './image-inventory.js'
+import { chooseHeroImage } from './hero-choice.js'
+import { tidyHomeBlocks } from './tidy-home.js'
 import type { CrawlResult } from '@modernizer/schema'
 
 export interface ExtractOptions {
   outputPath?: string
+  // Brand colors sampled from the rendered home page (buttons, header, links), strongest first
+  renderedColors?: readonly { hex: string; weight: number }[]
 }
 
 export const extract = async (
@@ -43,10 +49,11 @@ export const extract = async (
   const externalCss = await fetchLinkedCss(
     uniqueResults.map((r) => ({ rawHtml: r.rawHtml, url: r.finalUrl || r.url }))
   )
-  const colorCandidates = extractCandidateColors(uniqueResults, externalCss)
+  const rendered = (options.renderedColors ?? []).map((c, i): ColorCandidate => ({ label: `rendered-${i === 0 ? 'top' : i + 1}`, hex: c.hex, confidence: 'high' }))
+  const colorCandidates = [...rendered, ...extractCandidateColors(uniqueResults, externalCss)]
 
   // --- LLM: site-level data from chrome (1 call) ---
-  const siteData = await extractSiteData(chromeHtml, rootUrl, colorCandidates)
+  const siteData = await extractSiteData(chromeHtml, rootUrl, colorCandidates, rendered[0]?.hex)
 
   // --- LLM: per-page block classification (1 call per page, sequential to respect rate limits) ---
   const pages = []
@@ -82,11 +89,22 @@ export const extract = async (
         }
       : undefined
 
+  // --- deterministic image inventory, then one vision call to pick the hero photo ---
+  const { images, logoUrl } = imageInventory(uniqueResults.map((r) => ({ url: r.finalUrl || r.url, rawHtml: r.rawHtml })))
+  const heroImageUrl = await chooseHeroImage(images, rootUrl, siteData.siteName)
+  console.log(`  images: ${images.length} found, logo ${logoUrl ? 'found' : 'not found'}, hero ${heroImageUrl ?? 'none suitable'}`)
+  // The home page's own hero goes first, without duplicate bands around it, and shows the chosen photo
+  const home = pages[0]
+  if (home) home.blocks = tidyHomeBlocks(home.blocks, heroImageUrl)
+
   const siteSchema = {
     rootUrl,
     siteName: siteData.siteName,
     ...(siteData.tagline && { tagline: siteData.tagline }),
     brandColors: siteData.brandColors,
+    ...(logoUrl && { logoUrl }),
+    ...(heroImageUrl && { heroImageUrl }),
+    ...(images.length > 0 && { images }),
     nav: siteData.nav,
     ...(footer && { footer }),
     pages,
