@@ -157,7 +157,14 @@ export const splitBlocks = (contentHtml: string): RawBlock[] => {
   // Inline styles and scripts are text to cheerio and would pass as content
   $('style, script, noscript, template').remove()
 
-  const root = getContentRoot($)
+  // Look through single-child wrappers of any kind (main > article > div.entry-content > div.elementor
+  // on Elementor sites), or the whole page lands in one block
+  let root = getContentRoot($)
+  for (let depth = 0; depth < 10; depth++) {
+    const substantial = root.children('div, main, article, section').filter((_, child) => hasSubstantialText($.html(child) ?? ''))
+    if (substantial.length !== 1) break
+    root = substantial.first()
+  }
   const blocks: RawBlock[] = []
 
   collectBlocks($, root, blocks)

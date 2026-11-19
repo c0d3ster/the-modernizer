@@ -36,6 +36,16 @@ export interface SiteExtractionResult {
   footerAddress?: string
 }
 
+// The model sometimes answers with a candidate's label ("inline-style (#950e12)") instead of the hex
+const HEX = /#(?:[0-9a-f]{6}|[0-9a-f]{3})(?![0-9a-f])/i
+export const hexIn = (value: string | undefined): string | undefined => (value ? HEX.exec(value)?.[0]?.toLowerCase() : undefined)
+
+const hexColors = (colors: Partial<Record<keyof BrandColors, string>>): Partial<BrandColors> =>
+  Object.fromEntries(Object.entries(colors).flatMap(([key, value]) => {
+    const hex = hexIn(value)
+    return hex ? [[key, hex]] : []
+  }))
+
 export const extractSiteData = async (
   chromeHtml: string,
   rootUrl: string,
@@ -76,9 +86,9 @@ export const extractSiteData = async (
     siteName: validated.siteName,
     tagline: validated.tagline,
     brandColors: {
-      ...(validated.brandColors ?? {}),
-      primary,
-      background: validated.brandColors?.background ?? '#f4f1ec',
+      ...hexColors(validated.brandColors ?? {}),
+      primary: hexIn(primary) ?? FALLBACK_BLUE,
+      background: hexIn(validated.brandColors?.background) ?? '#f4f1ec',
     },
     nav: validated.nav,
     footerPhone: validated.footer?.phone,

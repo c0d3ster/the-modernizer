@@ -21,3 +21,10 @@ describe('stripChrome', () => {
     expect(contentHtml['https://example.com/']).not.toContain('<nav>')
   })
 })
+
+describe('splitBlocks page-builder roots', () => {
+  it('looks through main and article wrappers (Elementor pages)', () => {
+    const html = `<main><article><div class="entry-content"><div class="elementor">${section('About')}${section('Results')}${section('Contact')}</div></div></article></main>`
+    expect(splitBlocks(html)).toHaveLength(3)
+  })
+})
