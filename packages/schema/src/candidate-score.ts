@@ -26,7 +26,12 @@ export const CANDIDATE_SCORE_COLUMNS = [
   'psi_seo',
   'psi_accessibility',
   'notes',
+  // Business type of the discovery query that found the place (e.g. "plumber"). Appended last so
+  // files written before it existed still parse.
+  'vertical',
 ] as const
+
+const LEGACY_COLUMNS = CANDIDATE_SCORE_COLUMNS.filter((c) => c !== 'vertical')
 
 // CSV cells arrive as strings; typed callers pass real values. Both are accepted.
 const csvBoolean = z.preprocess(
@@ -76,6 +81,7 @@ export const candidateScoreSchema = z.object({
   psi_seo: optionalCsvScore,
   psi_accessibility: optionalCsvScore,
   notes: z.string(),
+  vertical: z.preprocess((value) => value ?? '', z.string()),
 })
 
 export type CandidateScore = z.infer<typeof candidateScoreSchema>
@@ -129,11 +135,12 @@ const parseCsvRecords = (csv: string): string[][] => {
 
 /**
  * Parses a candidates.csv file into validated rows. Throws if the header doesn't match
- * CANDIDATE_SCORE_COLUMNS exactly or any row fails validation.
+ * CANDIDATE_SCORE_COLUMNS exactly (or the older header without `vertical`) or any row fails validation.
  */
 export const parseCandidatesCsv = (csv: string): CandidateScore[] => {
   const [header, ...rows] = parseCsvRecords(csv)
-  if (!header || header.join(',') !== CANDIDATE_SCORE_COLUMNS.join(',')) {
+  const legacy = header?.join(',') === LEGACY_COLUMNS.join(',')
+  if (!header || (!legacy && header.join(',') !== CANDIDATE_SCORE_COLUMNS.join(','))) {
     throw new Error(
       `candidates.csv header does not match the expected columns: ${CANDIDATE_SCORE_COLUMNS.join(',')}`
     )

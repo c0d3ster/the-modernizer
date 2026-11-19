@@ -269,6 +269,8 @@ export interface ContinuingCandidate {
   address: string
   city: string
   state: string
+  // Business type of the Places query that found it, e.g. "plumber"
+  vertical: string
 }
 
 // Matches the doc's greenfield-leads.csv schema exactly:
@@ -330,6 +332,7 @@ export const runDiscovery = async (
       address: record.address,
       city: config.city,
       state: config.state,
+      vertical: record.vertical,
     })
   )
 
@@ -603,6 +606,7 @@ export const candidatesToCsv = (candidates: ScoredCandidate[]): string => {
       psi ? roundScore(psi.seo) : '',
       psi ? roundScore(psi.accessibility) : '',
       buildCandidateNotes(candidate),
+      candidate.vertical,
     ])
   })
   return [toCsvRow([...CANDIDATES_CSV_HEADER]), ...rows].join('\n') + '\n'
@@ -664,6 +668,8 @@ const ContinuingCandidatesFileSchema = z.array(
     address: z.string(),
     city: z.string(),
     state: z.string(),
+    // Files written before the vertical was kept have no field
+    vertical: z.string().default(''),
   })
 )
 
