@@ -60,7 +60,7 @@ export const detectFeatures = (): PageFeatures => {
     ['Flex', /flexbook|flexdental/i], ['Calendly', /calendly/i], ['Acuity', /acuityscheduling/i], ['Square', /squareup\.com\/appointments|square\.site\/book/i],
     ['Setmore', /setmore/i], ['Housecall Pro', /housecallpro/i], ['ServiceTitan', /servicetitan|scheduleengine/i], ['Jobber', /getjobber|jobber\.com/i],
     ['OpenTable', /opentable\.com/i], ['Resy', /resy\.com/i], ['Tock', /exploretock/i], ['Yelp', /yelp\.com\/reservations/i],
-    ['Sesame', /sesamecommunications|mysesame/i], ['Dentrix', /dentrixascend.*(book|schedul)|onlinescheduling\.dentrix/i],
+    ['Sesame', /sesamecommunications|mysesame/i], ['Modento', /modento/i], ['Dentrix', /dentrixascend.*(book|schedul)|onlinescheduling\.dentrix/i],
   ]
   // Some schedulers only load from inline scripts; match their function names, not loose mentions.
   const INLINE_BOOKING: readonly Vendor[] = [['ServiceTitan', /STWidgetManager|ScheduleEngine\.show/], ['Housecall Pro', /HCPWidget/]]
