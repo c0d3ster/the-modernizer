@@ -3,6 +3,7 @@ import type { SiteSchema, VerticalId } from '@modernizer/schema'
 // Keyword patterns per vertical. Deterministic on purpose: the business name, menu, page titles and
 // page text say what a local business does in almost every case.
 const PATTERNS: readonly (readonly [Exclude<VerticalId, 'general'>, RegExp])[] = [
+  ['landscaping', /\b(landscap\w*|lawns?|lawn care|mowing|hardscap\w*|patios?|pavers?|retaining walls?|mulch\w*|sod|seeding|aerat\w*|irrigation|sprinklers?|tree (service|care|removal|trimming)s?|stump\w*|shrubs?|planting|garden\w*|snow (removal|plowing)|outdoor living|yards?)\b/gi],
   ['dental', /\b(dent(al|ist|istry|ures?)|orthodont\w*|endodont\w*|periodont\w*|oral (and|&) (maxillo)?facial|oral surgery|braces|invisalign|implants?|dds|dmd|hygien\w*|smiles?|teeth|tooth|crowns?|root canals?)\b/gi],
   ['home-services', /\b(plumb\w*|hvac|heating|cooling|air condition\w*|heat pumps?|air quality|furnaces?|water heaters?|drains?|sewer|rooter|handyman|electric(al|ian)|roofing|gutters?|remodel\w*|contractors?|septic|duct\w*|comfort|generators?|residential|emergency service)\b/gi],
   ['cafe', /\b(caf[eé]|coffee|espresso|latte|roast(ed|ery|ers?)|bakery|pastr(y|ies)|bagels?|donuts?)\b/gi],
@@ -15,6 +16,8 @@ const PATTERNS: readonly (readonly [Exclude<VerticalId, 'general'>, RegExp])[] =
 
 // Places API business types used by discovery, mapped onto profiles
 const BUSINESS_TYPES: readonly (readonly [RegExp, VerticalId])[] = [
+  // Ahead of home services, which would otherwise claim "landscape contractor"
+  [/landscap|lawn|tree service|arborist|hardscap|irrigation|snow removal|gardener/i, 'landscaping'],
   [/dentist|dental|orthodont|endodont|periodont|oral surgeon/i, 'dental'],
   [/plumb|hvac|heating|air condition|electric|handyman|roof|contractor/i, 'home-services'],
   [/cafe|coffee|bakery/i, 'cafe'],
