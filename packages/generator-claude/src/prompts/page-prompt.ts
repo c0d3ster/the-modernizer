@@ -40,7 +40,7 @@ export const buildPagePrompt = (schema: SiteSchema, page: PageSchema, designSyst
 ${blocks}
 
 ## Additional Notes
-- The root layout (src/app/layout.tsx) already renders the Navbar and Footer around every page and wraps the page in \`<main>\` — do NOT render or import Navbar/Footer here, do NOT use a \`<main>\` element (start with a fragment or \`<div>\`), and do NOT import './globals.css' here
+- The root layout (src/app/layout.tsx) already renders the Navbar and Footer around every page and wraps the page in \`<main>\` — do NOT render or import Navbar/Footer here, do NOT use a \`<main>\` element (wrap all of the page's sections in a fragment instead), and do NOT import './globals.css' here
 - If a \`hero\` block has a \`backgroundImageUrl\`, render it as a full-bleed background via \`next/image\` (\`fill\` + \`object-cover\`), not just a color
 
 ## Required File
