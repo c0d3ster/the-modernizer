@@ -24,10 +24,17 @@ describe('syntaxErrors corruption that still parses', () => {
     const page = `import { Card } from '@/components/ui/card'\nimom\n\nexport default function Page() {\n  return null\n}\n`
     expect(syntaxErrors([{ path: 'src/app/x/page.tsx', content: page }])).toEqual([
       'src/app/x/page.tsx:2 stray word "imom" on its own line',
-      'src/app/x/page.tsx:4 the page component renders nothing (returns null)',
+      'src/app/x/page.tsx:4 the page component renders nothing (an empty element or null)',
     ])
     const tag = `export default function Page() {\n  return (\n    <main>\n      <Separator-section />\n    </main>\n  )\n}\n`
     expect(syntaxErrors([{ path: 'src/app/page.tsx', content: tag }])).toEqual(['src/app/page.tsx:4 invalid component tag <Separator-section>'])
+  })
+
+  it('flags a page that returns an empty element or fragment', () => {
+    for (const body of ['<div />', '(\n    <>\n    </>\n  )', '<main></main>']) {
+      const page = `const items = [1, 2]\n\nexport default function HomePage() {\n  return ${body}\n}\n`
+      expect(syntaxErrors([{ path: 'src/app/page.tsx', content: page }])).toEqual(['src/app/page.tsx:3 the page component renders nothing (an empty element or null)'])
+    }
   })
 
   it('leaves normal components alone', () => {
