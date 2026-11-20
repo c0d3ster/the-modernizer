@@ -5,8 +5,8 @@ import { generateGlobalsCss } from './config-generator.js'
 
 describe('generateGlobalsCss', () => {
   it('keeps the default look when no theme is given', () => {
-    const css = generateGlobalsCss({ primary: '#0f766e' })
-    expect(css).toContain('--color-primary: #0f766e;')
+    const css = generateGlobalsCss({ primary: '#115e59' })
+    expect(css).toContain('--color-primary: #115e59;')
     expect(css).toContain('--color-background: #f4f1ec;')
     expect(css).toContain('text-transform: none;')
   })
