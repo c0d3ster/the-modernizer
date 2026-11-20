@@ -5,9 +5,21 @@ const PAGE_FILE = /(^|\/)page\.(tsx|jsx)$/
 
 const lineOf = (source: ts.SourceFile, node: ts.Node): number => source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1
 
-const returnsOnlyNull = (body: ts.Block | undefined): boolean => {
+const unwrap = (node: ts.Expression): ts.Expression => (ts.isParenthesizedExpression(node) ? unwrap(node.expression) : node)
+
+const isBlankChild = (child: ts.JsxChild): boolean => ts.isJsxText(child) && child.text.trim() === ''
+
+/** null, or an element/fragment with no content: <div />, <></>, <main></main> */
+const isEmptyRender = (node: ts.Expression): boolean => {
+  const e = unwrap(node)
+  if (e.kind === ts.SyntaxKind.NullKeyword || ts.isJsxSelfClosingElement(e)) return true
+  if (ts.isJsxElement(e) || ts.isJsxFragment(e)) return e.children.every(isBlankChild)
+  return false
+}
+
+const rendersNothing = (body: ts.Block | undefined): boolean => {
   const [only, ...rest] = body?.statements ?? []
-  return rest.length === 0 && only !== undefined && ts.isReturnStatement(only) && only.expression?.kind === ts.SyntaxKind.NullKeyword
+  return rest.length === 0 && only !== undefined && ts.isReturnStatement(only) && only.expression !== undefined && isEmptyRender(only.expression)
 }
 
 /**
@@ -22,8 +34,8 @@ const corruption = (path: string, content: string): string[] => {
     if (ts.isExpressionStatement(statement) && ts.isIdentifier(statement.expression)) {
       errors.push(`${path}:${lineOf(source, statement)} stray word "${statement.expression.text}" on its own line`)
     }
-    if (PAGE_FILE.test(path) && ts.isFunctionDeclaration(statement) && statement.modifiers?.some((m) => m.kind === ts.SyntaxKind.DefaultKeyword) && returnsOnlyNull(statement.body)) {
-      errors.push(`${path}:${lineOf(source, statement)} the page component renders nothing (returns null)`)
+    if (PAGE_FILE.test(path) && ts.isFunctionDeclaration(statement) && statement.modifiers?.some((m) => m.kind === ts.SyntaxKind.DefaultKeyword) && rendersNothing(statement.body)) {
+      errors.push(`${path}:${lineOf(source, statement)} the page component renders nothing (an empty element or null)`)
     }
   }
   const visit = (node: ts.Node): void => {
