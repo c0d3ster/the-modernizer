@@ -453,6 +453,8 @@ Businesses with an existing website, sorted by modernity score ascending — low
 | `psi_best_practices` | 0-100 | Lighthouse Best Practices score |
 | `psi_code` | 0-100 | Build-quality audit score |
 | `pitch` | boolean | Composite below the pitch threshold (81) |
+| `latitude` | number | Map pin from Google Places (`places.location`); empty for runs before coordinates were kept |
+| `longitude` | number | Map pin from Google Places |
 
 Columns are only ever appended, so files written before a column existed still parse (missing trailing columns read as empty).
 
@@ -471,6 +473,8 @@ Businesses with no website detected. No scoring — they can't be crawled. Direc
 | `review_count` | number | Google review count — proxy for business activity |
 | `rating` | number | Google rating |
 | `place_id` | string | Google Place ID — for follow-up Details API calls if needed |
+| `latitude` | number | Map pin from Google Places |
+| `longitude` | number | Map pin from Google Places |
 
 ---
 
