@@ -19,7 +19,7 @@ Discover → Crawl → Extract → Schema JSON → Generate
 | Extract | `@modernizer/extractor` | Converts raw HTML into structured page schemas using deterministic parsing + LLM classification, plus the logo, real photos, hero choice and rendered brand colors |
 | Generate | see below | Three generator options depending on use case |
 
-Every generator takes its look from the site's **vertical** (dental, legal, home services, restaurant, cafe, auto, chiropractic, veterinary, or general): fonts, neutrals, hero style, the main call to action, header phone and trust signals all come from that vertical's design profile in `@modernizer/design-guide`. The vertical is detected from the content, or set with `--vertical`.
+Every generator takes its look from the site's **vertical** (dental, legal, home services, landscaping, restaurant, cafe, auto, chiropractic, veterinary, or general): fonts, neutrals, hero style, the main call to action, header phone and trust signals all come from that vertical's design profile in `@modernizer/design-guide`. The vertical is detected from the content, or set with `--vertical`.
 
 ## Generator Modes
 
