@@ -10,6 +10,7 @@ import { generateReport } from './report-generator.js'
 import { placeBlocks } from './block-placer.js'
 import { synthesizeGallery, synthesizeHero, synthesizePageHeaders } from './hero-synthesizer.js'
 import { resolveSiteStyle } from './site-style.js'
+import { shortenHeroLeads } from './hero-lead.js'
 import {
   generatePackageJson,
   generateNextConfig,
@@ -45,6 +46,8 @@ export const generateSite = async (schema: SiteSchema, outputDir: string): Promi
   const style = resolveSiteStyle(placedSchema)
   schema = synthesizeHero(placedSchema, style.primaryAction)
   schema = synthesizePageHeaders(schema)
+  // Long welcome paragraphs leave the hero; the overflow follows it as a text section
+  schema = shortenHeroLeads(schema)
   schema = synthesizeGallery(schema)
 
   // 1. Copy component library (shadcn primitives, blocks, layout, lib, styles, schema types)
