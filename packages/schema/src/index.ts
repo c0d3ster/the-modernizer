@@ -61,8 +61,10 @@ export {
   CANDIDATE_SCORE_COLUMNS,
   candidateScoreSchema,
   parseCandidatesCsv,
+  COMPOSITE_WEIGHTS,
+  PITCH_THRESHOLD,
 } from './candidate-score.js'
-export type { CandidateScore } from './candidate-score.js'
+export type { CandidateScore, CompositeSignal } from './candidate-score.js'
 
 export {
   COVERAGE_KINDS,
