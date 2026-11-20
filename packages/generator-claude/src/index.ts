@@ -8,6 +8,8 @@ import {
   generatePostcss,
   generateGlobalsCss,
   collectImageHostnames,
+  generateIconSvg,
+  resolvePalette,
 } from '@modernizer/generator-config'
 import { copyDeterministicComponents } from './component-copier.js'
 import { callClaudeForFiles, costForUsage, getUsageTotals, resetUsageTotals, type GeneratedFile } from './llm-client.js'
@@ -17,6 +19,7 @@ import { buildPagePrompt } from './prompts/page-prompt.js'
 import { fillMissingHeroImages } from './hero-image.js'
 import { extractDesignSystemSpec } from './design-system.js'
 import { profileFor, verticalOf } from '@modernizer/design-guide'
+import { demoteMainLandmark, generateClaudeLayout } from './layout.js'
 
 const PAGE_CONCURRENCY = 4
 
@@ -64,7 +67,9 @@ export const generateWithClaude = async (siteSchema: SiteSchema, outDir: string,
     pageFiles = [...firstPageFiles, ...restPageFiles]
   }
 
-  const claudeFiles: GeneratedFile[] = [...shellFiles, ...pageFiles]
+  // The layout supplies the one <main> landmark, so pages don't add their own
+  const claudeFiles: GeneratedFile[] = [...shellFiles, ...pageFiles.map((f) => (f.path.endsWith('page.tsx') ? { ...f, content: demoteMainLandmark(f.content) } : f))]
+  const theme = profileFor(verticalOf(schema)).theme
 
   const deterministicComponents = await copyDeterministicComponents()
   const deterministicFiles: GeneratedFile[] = [
@@ -72,7 +77,10 @@ export const generateWithClaude = async (siteSchema: SiteSchema, outDir: string,
     { path: 'next.config.ts', content: generateNextConfig(collectImageHostnames(schema)) },
     { path: 'tsconfig.json', content: generateTsConfig() },
     { path: 'postcss.config.mjs', content: generatePostcss() },
-    { path: 'src/app/globals.css', content: generateGlobalsCss(schema.brandColors, profileFor(verticalOf(schema)).theme) },
+    { path: 'src/app/globals.css', content: generateGlobalsCss(schema.brandColors, theme) },
+    { path: 'src/app/layout.tsx', content: generateClaudeLayout(schema) },
+    // Next.js links src/app/icon.svg itself; without one browsers 404 on /favicon.ico
+    { path: 'src/app/icon.svg', content: generateIconSvg(schema.siteName, resolvePalette(schema.brandColors, theme)) },
     ...deterministicComponents,
     // docs/ is where every human-facing artifact of the modernization effort lands (design
     // system today; the modernization report will join it once that exists) — not under src/
