@@ -59,6 +59,9 @@ export const CANDIDATE_SCORE_COLUMNS = [
   'psi_best_practices',
   'psi_code',
   'pitch',
+  // Map pin from Google Places, for showing leads on a map
+  'latitude',
+  'longitude',
 ] as const
 
 // Files written before a column existed end where it starts; any header that is the current one
@@ -92,6 +95,12 @@ const optionalCsvCount = z.preprocess(
   (value) => (value === '' || value === undefined ? null : typeof value === 'string' ? Number(value) : value),
   z.number().int().min(0).nullable()
 )
+
+const optionalCsvCoordinate = (limit: number): z.ZodType<number | null, z.ZodTypeDef, unknown> =>
+  z.preprocess(
+    (value) => (value === '' || value === undefined ? null : typeof value === 'string' ? Number(value) : value),
+    z.number().min(-limit).max(limit).nullable()
+  )
 
 const optionalCsvDate = z.preprocess(
   (value) => (value === '' || value === undefined ? null : value),
@@ -132,6 +141,8 @@ export const candidateScoreSchema = z.object({
   psi_best_practices: optionalCsvScore,
   psi_code: optionalCsvScore,
   pitch: optionalCsvBoolean,
+  latitude: optionalCsvCoordinate(90),
+  longitude: optionalCsvCoordinate(180),
 })
 
 export type CandidateScore = z.infer<typeof candidateScoreSchema>
