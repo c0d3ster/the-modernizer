@@ -2,6 +2,7 @@ import { readFile, rm, access } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
+import { contrastRatio, TEXT_CONTRAST } from '@modernizer/generator-config'
 import { generateSite } from './index.js'
 import { PageArchetype, type SiteSchema } from '@modernizer/schema'
 
@@ -155,7 +156,10 @@ describe('generateSite', () => {
   describe('global styles', () => {
     it('injects brand primary color into globals.css', async () => {
       const css = await read('src/app/globals.css')
-      expect(css).toContain('--color-primary: #b45309')
+      // The brand amber, deepened only as far as needed to read as text on the cafe's muted surfaces
+      const primary = css.match(/--color-primary: (#[0-9a-f]{6});/)?.[1] ?? ''
+      expect(primary).not.toBe('')
+      expect(contrastRatio(primary, '#fffbf5')).toBeGreaterThanOrEqual(TEXT_CONTRAST)
       expect(css).toContain('--color-background: #fffbf5')
       expect(css).toContain('@source "../"')
       expect(css).not.toContain('@plugin')
@@ -174,7 +178,15 @@ describe('generateSite', () => {
       expect(layout).toContain('hello@example-bakery.com')
       expect(layout).toContain('42 Maple Street')
       // nav URLs should be relative, not full absolute URLs
-      expect(layout).not.toContain('https://example-bakery.com')
+      const navLiteral = layout.slice(layout.indexOf('const nav'), layout.indexOf('const RootLayout'))
+      expect(navLiteral).not.toContain('https://example-bakery.com')
+    })
+
+    it('adds share tags and a favicon', async () => {
+      const layout = await read('src/app/layout.tsx')
+      expect(layout).toContain('metadataBase: new URL("https://example-bakery.com")')
+      expect(layout).toContain('openGraph: {')
+      expect(await read('src/app/icon.svg')).toContain('>S</text>')
     })
 
     it('styles the shell for the business type (a bakery reads as a cafe)', async () => {

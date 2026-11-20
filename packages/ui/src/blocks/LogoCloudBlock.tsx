@@ -1,5 +1,7 @@
 import type { LogoCloudBlock as LogoCloudBlockData } from '@modernizer/schema'
+import Image from 'next/image'
 import { cn } from '../lib/cn'
+import { skipOptimization } from '../lib/image'
 import { container, section } from '../styles/tokens'
 
 interface LogoCloudBlockProps {
@@ -20,10 +22,13 @@ export const LogoCloudBlock = ({ block }: LogoCloudBlockProps): React.ReactEleme
         <div className="flex flex-wrap items-center justify-center gap-8 lg:gap-12">
           {logos.map((logo, i) => {
             const img = (
-              <img
+              <Image
                 src={logo.imageUrl}
                 alt={logo.name}
-                className="h-8 max-w-[120px] object-contain opacity-50 grayscale transition-all hover:opacity-100 hover:grayscale-0"
+                width={120}
+                height={32}
+                unoptimized={skipOptimization(logo.imageUrl)}
+                className="h-8 w-auto max-w-[120px] object-contain opacity-50 grayscale transition-all hover:opacity-100 hover:grayscale-0"
               />
             )
             return logo.url ? (

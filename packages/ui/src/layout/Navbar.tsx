@@ -1,10 +1,12 @@
 'use client'
 
 import * as React from 'react'
+import Image from 'next/image'
 import Link from 'next/link'
 import type { NavItem } from '@modernizer/schema'
 import { Button } from '../shadcn/button'
 import { cn } from '../lib/cn'
+import { skipOptimization } from '../lib/image'
 import { container } from '../styles/tokens'
 import { Menu, X, ChevronDown, Phone } from 'lucide-react'
 
@@ -108,7 +110,7 @@ export const Navbar = ({ siteName, logoUrl, nav, ctaText, ctaUrl, phone, maxVisi
       <div className={cn(container, 'flex h-16 items-center justify-between gap-6 lg:h-20')}>
         {logoUrl ? (
           <Link href="/" className="flex shrink-0 items-center">
-            <img src={logoUrl} alt="" className="h-9 w-auto max-w-[11rem] object-contain lg:h-11 lg:max-w-[14rem]" />
+            <Image src={logoUrl} alt="" width={224} height={44} priority unoptimized={skipOptimization(logoUrl)} className="h-9 w-auto max-w-[11rem] object-contain object-left lg:h-11 lg:max-w-[14rem]" />
             <span className="sr-only">{siteName}</span>
           </Link>
         ) : (

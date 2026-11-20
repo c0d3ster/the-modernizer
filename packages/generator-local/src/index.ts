@@ -18,6 +18,8 @@ import {
   generatePrettier,
   generateEslint,
   collectImageHostnames,
+  generateIconSvg,
+  resolvePalette,
 } from '@modernizer/generator-config'
 
 /** Files in `packages/generator/sample-assets/` are copied to `<output>/public/` (Next.js static URL root). */
@@ -73,11 +75,12 @@ export const generateSite = async (schema: SiteSchema, outputDir: string): Promi
     writeFile(join(outputDir, 'MODERNIZATION_REPORT.md'), generateReport(schema, nav)),
   ])
 
-  // 3. App directory: layout + global styles
+  // 3. App directory: layout, global styles and the favicon (Next.js links src/app/icon.svg itself)
   await mkdir(join(outputDir, 'src/app'), { recursive: true })
   await Promise.all([
     writeFile(join(outputDir, 'src/app/globals.css'), generateGlobalsCss(schema.brandColors, style.profile.theme)),
     writeFile(join(outputDir, 'src/app/layout.tsx'), generateLayout(schema, style)),
+    writeFile(join(outputDir, 'src/app/icon.svg'), generateIconSvg(schema.siteName, resolvePalette(schema.brandColors, style.profile.theme))),
   ])
 
   // 4. One page file per PageSchema
