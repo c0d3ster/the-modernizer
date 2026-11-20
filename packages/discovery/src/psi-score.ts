@@ -13,15 +13,33 @@ export const PSI_SCORE_WEIGHTS = {
 // Untrusted external API boundary — validated rather than cast. A missing category
 // (malformed/partial result) fails validation entirely rather than silently scoring
 // with a zeroed-out category, since that would produce a misleadingly confident number.
+const categoryScore = z.object({ score: z.number().min(0).max(1) })
+
 const PsiResponseSchema = z.object({
   lighthouseResult: z.object({
     categories: z.object({
-      performance: z.object({ score: z.number().min(0).max(1) }),
-      seo: z.object({ score: z.number().min(0).max(1) }),
-      accessibility: z.object({ score: z.number().min(0).max(1) }),
+      performance: categoryScore,
+      seo: categoryScore,
+      accessibility: categoryScore,
+      // Requested too, but optional so an older or partial result still scores the rest
+      'best-practices': categoryScore.optional(),
     }),
+    audits: z.record(z.string(), z.object({ score: z.number().min(0).max(1).nullable().optional() })).optional(),
   }),
 })
+
+/**
+ * Build-quality audits that tracked the hand-rated pitch calls on the Winchester bench, unlike
+ * the performance category itself (which ranks heavy, polished sites low). Each entry lists the
+ * Lighthouse 13 insight id first, then the id older Lighthouse versions used.
+ */
+export const CODE_AUDITS: readonly (readonly string[])[] = [
+  ['legacy-javascript-insight', 'legacy-javascript'],
+  ['font-display-insight', 'font-display'],
+  ['duplicated-javascript-insight', 'duplicated-javascript'],
+  ['bootup-time'],
+  ['unsized-images'],
+]
 
 export interface PsiCategoryScores {
   performance: number
@@ -31,6 +49,19 @@ export interface PsiCategoryScores {
 
 export interface PsiScoreResult extends PsiCategoryScores {
   score: number
+  // 0-100, null when PSI didn't return the category
+  bestPractices: number | null
+  // 0-100 mean of CODE_AUDITS (an audit Lighthouse skipped counts as passed); null when no audits came back
+  code: number | null
+}
+
+type PsiAudits = Record<string, { score?: number | null }>
+
+/** Mean score of the build-quality audits, 0-100. */
+export const computeCodeScore = (audits: PsiAudits | undefined): number | null => {
+  if (!audits || Object.keys(audits).length === 0) return null
+  const scores = CODE_AUDITS.map((ids) => ids.map((id) => audits[id]?.score).find((s): s is number => typeof s === 'number') ?? 1)
+  return (100 * scores.reduce((sum, s) => sum + s, 0)) / scores.length
 }
 
 export interface PsiScoreOptions {
@@ -65,6 +96,7 @@ export const fetchPsiScore = async (
   params.append('category', 'performance')
   params.append('category', 'seo')
   params.append('category', 'accessibility')
+  params.append('category', 'best-practices')
 
   try {
     // Complex/large pages (verified live against amazon.com) can take 45-55s for PSI to
@@ -79,14 +111,15 @@ export const fetchPsiScore = async (
     const parsed = PsiResponseSchema.safeParse(json)
     if (!parsed.success) return null
 
-    const { performance, seo, accessibility } = parsed.data.lighthouseResult.categories
+    const { categories: raw, audits } = parsed.data.lighthouseResult
     const categories: PsiCategoryScores = {
-      performance: performance.score * 100,
-      seo: seo.score * 100,
-      accessibility: accessibility.score * 100,
+      performance: raw.performance.score * 100,
+      seo: raw.seo.score * 100,
+      accessibility: raw.accessibility.score * 100,
     }
+    const bestPractices = raw['best-practices'] ? raw['best-practices'].score * 100 : null
 
-    return { ...categories, score: computePsiScore(categories) }
+    return { ...categories, score: computePsiScore(categories), bestPractices, code: computeCodeScore(audits) }
   } catch {
     return null
   }

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import { computePsiScore, fetchPsiScore, PSI_SCORE_WEIGHTS } from './psi-score.js'
+import { computeCodeScore, computePsiScore, fetchPsiScore, PSI_SCORE_WEIGHTS } from './psi-score.js'
 
 const buildPsiResponse = (categories: {
   performance: number
@@ -114,5 +114,29 @@ describe('fetchPsiScore', () => {
     const requestedUrl = fetchImpl.mock.calls[0]?.[0] as string
     expect(requestedUrl).toContain('strategy=mobile')
     expect(requestedUrl).toContain('key=test-key')
+  })
+
+  it('reads Best Practices and the code audits from the same response', async () => {
+    const response = {
+      lighthouseResult: {
+        categories: { performance: { score: 0.5 }, seo: { score: 1 }, accessibility: { score: 0.9 }, 'best-practices': { score: 0.77 } },
+        audits: { 'legacy-javascript-insight': { score: 0 }, 'font-display': { score: 0.5 }, 'bootup-time': { score: 1 }, 'unsized-images': { score: null } },
+      },
+    }
+    const fetchImpl = vi.fn().mockResolvedValue({ ok: true, json: async () => response })
+
+    const result = await fetchPsiScore('https://example.com', { apiKey: 'test-key', fetchImpl })
+
+    expect(result?.bestPractices).toBeCloseTo(77)
+    // legacy JS 0, font display 0.5 (older id), duplicated JS missing = pass, bootup 1, unsized null = pass
+    expect(result?.code).toBeCloseTo(70)
+    expect(fetchImpl.mock.calls[0]?.[0] as string).toContain('category=best-practices')
+  })
+})
+
+describe('computeCodeScore', () => {
+  it('is null when PSI returned no audits', () => {
+    expect(computeCodeScore(undefined)).toBeNull()
+    expect(computeCodeScore({})).toBeNull()
   })
 })

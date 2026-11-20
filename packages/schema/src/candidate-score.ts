@@ -1,5 +1,25 @@
 import { z } from 'zod'
 
+/**
+ * Composite weights behind the `score` column, picked on the Winchester rating bench (47 hand-rated
+ * sites) and checked against the sites our generators rebuild (docs/market-discovery.md "Final score
+ * formula"). Visual carries half; the other signals are ones a rebuild maxes out, so they also show
+ * its lift. Shared here so the scorer and the modernization report can't drift apart.
+ */
+export const COMPOSITE_WEIGHTS = {
+  visual: 0.5,
+  static: 0.1,
+  code: 0.1,
+  seo: 0.1,
+  accessibility: 0.1,
+  bestPractices: 0.1,
+} as const
+
+export type CompositeSignal = keyof typeof COMPOSITE_WEIGHTS
+
+/** Pitch a site whose composite is below this. Calibrated on the bench; recheck as more cities are rated. */
+export const PITCH_THRESHOLD = 81
+
 // One row of the market-discovery pipeline's candidates.csv. Keys match the columns in
 // docs/market-discovery.md "Output Format" > candidates.csv exactly, in order, so the CSV
 // writer (scripts/discover-candidates.ts), the modernization report, and outreach all
@@ -29,9 +49,21 @@ export const CANDIDATE_SCORE_COLUMNS = [
   // Business type of the discovery query that found the place (e.g. "plumber"). Appended last so
   // files written before it existed still parse.
   'vertical',
+  // Composite inputs (docs/market-discovery.md "Final score formula"), appended for the same reason.
+  // `score` above is the composite; `static_score` and `psi_score` stay as informational sub-scores.
+  'visual_points',
+  'static_v2_score',
+  'copyright_years_behind',
+  'no_srcset',
+  'inline_styles',
+  'psi_best_practices',
+  'psi_code',
+  'pitch',
 ] as const
 
-const LEGACY_COLUMNS = CANDIDATE_SCORE_COLUMNS.filter((c) => c !== 'vertical')
+// Files written before a column existed end where it starts; any header that is the current one
+// cut short at or after `notes` parses, with the missing trailing columns read as empty.
+const OLDEST_COLUMN_COUNT = CANDIDATE_SCORE_COLUMNS.indexOf('notes') + 1
 
 // CSV cells arrive as strings; typed callers pass real values. Both are accepted.
 const csvBoolean = z.preprocess(
@@ -49,6 +81,16 @@ const csvScore = z.preprocess(
 const optionalCsvScore = z.preprocess(
   (value) => (value === '' || value === undefined ? null : value),
   csvScore.nullable()
+)
+
+const optionalCsvBoolean = z.preprocess(
+  (value) => (value === '' || value === undefined ? null : value === 'true' ? true : value === 'false' ? false : value),
+  z.boolean().nullable()
+)
+
+const optionalCsvCount = z.preprocess(
+  (value) => (value === '' || value === undefined ? null : typeof value === 'string' ? Number(value) : value),
+  z.number().int().min(0).nullable()
 )
 
 const optionalCsvDate = z.preprocess(
@@ -82,6 +124,14 @@ export const candidateScoreSchema = z.object({
   psi_accessibility: optionalCsvScore,
   notes: z.string(),
   vertical: z.preprocess((value) => value ?? '', z.string()),
+  visual_points: optionalCsvScore,
+  static_v2_score: optionalCsvScore,
+  copyright_years_behind: optionalCsvCount,
+  no_srcset: optionalCsvBoolean,
+  inline_styles: optionalCsvCount,
+  psi_best_practices: optionalCsvScore,
+  psi_code: optionalCsvScore,
+  pitch: optionalCsvBoolean,
 })
 
 export type CandidateScore = z.infer<typeof candidateScoreSchema>
@@ -133,14 +183,18 @@ const parseCsvRecords = (csv: string): string[][] => {
   return records
 }
 
+const isKnownHeader = (header: string[]): boolean =>
+  header.length >= OLDEST_COLUMN_COUNT &&
+  header.length <= CANDIDATE_SCORE_COLUMNS.length &&
+  header.every((column, i) => column === CANDIDATE_SCORE_COLUMNS[i])
+
 /**
- * Parses a candidates.csv file into validated rows. Throws if the header doesn't match
- * CANDIDATE_SCORE_COLUMNS exactly (or the older header without `vertical`) or any row fails validation.
+ * Parses a candidates.csv file into validated rows. Throws if the header isn't CANDIDATE_SCORE_COLUMNS
+ * (or an older file's shorter version of it) or any row fails validation.
  */
 export const parseCandidatesCsv = (csv: string): CandidateScore[] => {
   const [header, ...rows] = parseCsvRecords(csv)
-  const legacy = header?.join(',') === LEGACY_COLUMNS.join(',')
-  if (!header || (!legacy && header.join(',') !== CANDIDATE_SCORE_COLUMNS.join(','))) {
+  if (!header || !isKnownHeader(header)) {
     throw new Error(
       `candidates.csv header does not match the expected columns: ${CANDIDATE_SCORE_COLUMNS.join(',')}`
     )

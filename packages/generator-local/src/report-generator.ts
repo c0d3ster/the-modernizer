@@ -1,4 +1,5 @@
-import type { CandidateScore, SiteSchema } from '@modernizer/schema'
+import { COMPOSITE_WEIGHTS, PITCH_THRESHOLD } from '@modernizer/schema'
+import type { CandidateScore, CompositeSignal, SiteSchema } from '@modernizer/schema'
 import { urlToRoutePath, urlToComponentName } from './route-mapper.js'
 
 const mdTableCell = (s: string): string => s.replace(/\|/g, '\\|')
@@ -35,16 +36,29 @@ const countBlocks = (schema: SiteSchema): Record<string, number> => {
   return counts
 }
 
-// Thresholds per docs/market-discovery.md "Final score formula".
-const scoreVerdict = (score: number): string => {
-  if (score <= 40) return 'Strong candidate: clear visual case for modernization'
-  if (score <= 60) return 'Moderate candidate: worth a closer look'
-  return 'Already fairly modern: a harder pitch'
-}
+// Cutoff per docs/market-discovery.md "Final score formula"
+const scoreVerdict = (score: number): string =>
+  score < PITCH_THRESHOLD
+    ? `Pitch candidate: below the pitch threshold of ${PITCH_THRESHOLD}`
+    : `Above the pitch threshold of ${PITCH_THRESHOLD}: already fairly modern, a harder pitch`
 
 const formatScore = (score: number | null): string => (score === null ? 'n/a' : `${score}`)
 
 const yesNo = (fired: boolean): string => (fired ? 'Yes' : 'No')
+
+const yesNoOrNa = (fired: boolean | null): string => (fired === null ? 'n/a' : yesNo(fired))
+
+const weight = (signal: CompositeSignal): string => `${Math.round(COMPOSITE_WEIGHTS[signal] * 100)}%`
+
+// The composite's inputs, in docs/market-discovery.md order
+const compositeRows = (candidate: CandidateScore): Array<{ label: string; value: number | null; signal: CompositeSignal }> => [
+  { label: 'Visual design (screenshots)', value: candidate.visual_points, signal: 'visual' },
+  { label: 'Static HTML', value: candidate.static_v2_score, signal: 'static' },
+  { label: 'Build quality (Lighthouse audits)', value: candidate.psi_code, signal: 'code' },
+  { label: 'SEO (Lighthouse)', value: candidate.psi_seo, signal: 'seo' },
+  { label: 'Accessibility (Lighthouse)', value: candidate.psi_accessibility, signal: 'accessibility' },
+  { label: 'Best Practices (Lighthouse)', value: candidate.psi_best_practices, signal: 'bestPractices' },
+]
 
 // Signal descriptions per docs/market-discovery.md "Sub-score 1: Static HTML".
 const staticSignalRows = (candidate: CandidateScore): string[] => [
@@ -55,20 +69,22 @@ const staticSignalRows = (candidate: CandidateScore): string[] => [
   `| Table-based layout | ${yesNo(candidate.table_layout)} |`,
   `| No Open Graph tags | ${yesNo(candidate.no_og_tags)} |`,
   `| IE compatibility meta tag | ${yesNo(candidate.ie_compatible)} |`,
+  `| Years since the copyright year | ${formatScore(candidate.copyright_years_behind)} |`,
+  `| No responsive images (srcset) | ${yesNoOrNa(candidate.no_srcset)} |`,
+  `| Inline style attributes | ${formatScore(candidate.inline_styles)} |`,
 ]
 
 const renderScoreSection = (candidate: CandidateScore): string => {
-  const psiAvailable = candidate.psi_performance !== null
-  const subScoreRows = [
-    `| Static HTML | ${formatScore(candidate.static_score)} | 25% |`,
-    `| Performance (Lighthouse, mobile) | ${formatScore(candidate.psi_performance)} | 25% |`,
-    `| SEO (Lighthouse) | ${formatScore(candidate.psi_seo)} | 25% |`,
-    `| Accessibility (Lighthouse) | ${formatScore(candidate.psi_accessibility)} | 25% |`,
-  ].join('\n')
-
-  const psiNote = psiAvailable
-    ? `PSI composite (informational, not part of the final score): ${formatScore(candidate.psi_score)}`
-    : 'PageSpeed Insights data was unavailable for this site, so the final score is the static HTML score alone.'
+  const rows = compositeRows(candidate)
+  const subScoreRows = rows.map(({ label, value, signal }) => `| ${label} | ${formatScore(value)} | ${weight(signal)} |`).join('\n')
+  const missingNote = rows.some(({ value }) => value === null)
+    ? '\nSignals shown as n/a were unavailable for this site, so the others were reweighted to fill their share.\n'
+    : ''
+  // Kept as talking points; neither counts toward the score
+  const informational = [
+    candidate.psi_performance !== null && `Lighthouse performance (mobile) ${formatScore(candidate.psi_performance)}`,
+    `legacy static HTML score ${formatScore(candidate.static_score)}`,
+  ].filter(Boolean)
 
   const staleness = candidate.last_changed
     ? `Content last changed **${candidate.last_changed}** (Wayback Machine).`
@@ -81,8 +97,8 @@ const renderScoreSection = (candidate: CandidateScore): string => {
 | Sub-score | Score | Weight |
 |-----------|-------|--------|
 ${subScoreRows}
-
-${psiNote}
+${missingNote}
+Not in the score: ${informational.join(', ')}.
 
 ### Static HTML Signals
 
