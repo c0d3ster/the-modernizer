@@ -1,5 +1,6 @@
 import type { SiteSchema, ContentBlock, BrandColors } from '@modernizer/schema'
 import type { SiteTheme } from '@modernizer/design-guide'
+import { ensureContrast, readableOn } from './contrast.js'
 
 /**
  * Walks all blocks across all pages and collects unique external image hostnames.
@@ -95,8 +96,9 @@ export const generatePackageJson = (schema: SiteSchema): string =>
   )
 
 export const generateNextConfig = (imageHostnames: string[] = []): string => {
+  // next/image only fetches listed hosts; old sites still serve some images over plain http
   const remotePatterns = imageHostnames
-    .map((hostname) => `    { protocol: 'https', hostname: '${hostname}' },`)
+    .flatMap((hostname) => [`    { protocol: 'https', hostname: '${hostname}' },`, `    { protocol: 'http', hostname: '${hostname}' },`])
     .join('\n')
 
   const imagesBlock = imageHostnames.length > 0
@@ -207,18 +209,45 @@ const sanitizeThemeColor = (value: string | undefined, fallback: string): string
  * win over Tailwind utilities live in `@layer base` — anything left unlayered would override
  * layered utilities like `mx-auto`/`px-4` regardless of specificity, per the CSS cascade layers spec.
  */
-export const generateGlobalsCss = (brandColors: BrandColors, theme?: SiteTheme): string => {
-  const primary = sanitizeThemeColor(brandColors.primary, '#2563eb')
-  const primaryForeground = sanitizeThemeColor(brandColors.text, '#ffffff')
+export interface Palette {
+  primary: string
+  primaryForeground: string
+  background: string
+  foreground: string
+  muted: string
+  mutedForeground: string
+  card: string
+  border: string
+  accent: string
+}
+
+/** The site's theme colors, with text pairs guaranteed readable (shared by globals.css and the favicon). */
+export const resolvePalette = (brandColors: BrandColors, theme?: SiteTheme): Palette => {
   // A site's own background wins; otherwise the vertical's neutral, then the warm default
   const background = sanitizeThemeColor(brandColors.background, sanitizeThemeColor(theme?.background, DEFAULT_PAGE_BACKGROUND))
-  const tone = (value: string | undefined, fallback: string): string => sanitizeThemeColor(value, fallback)
-  const foreground = tone(theme?.foreground, '#1c1917')
-  const muted = tone(theme?.muted, '#e8e5e0')
-  const mutedForeground = tone(theme?.mutedForeground, '#57534e')
-  const card = tone(theme?.card, '#fffdfb')
-  const border = tone(theme?.border, '#e0d9d0')
-  const accent = tone(theme?.accent, '#ece8e2')
+  const foreground = sanitizeThemeColor(theme?.foreground, '#1c1917')
+  const muted = sanitizeThemeColor(theme?.muted, '#e8e5e0')
+  const card = sanitizeThemeColor(theme?.card, '#fffdfb')
+  // Primary doubles as link/heading text (`text-primary`) on every light surface, so a pale brand
+  // color (yellow, light blue) is deepened just enough to stay readable; the hue is kept.
+  const primary = ensureContrast(sanitizeThemeColor(brandColors.primary, '#2563eb'), [background, card, muted])
+  // Text on primary fills. The site's body text color is only a candidate, never assumed to fit.
+  const primaryForeground = readableOn(primary, ['#ffffff', ...(brandColors.text ? [sanitizeThemeColor(brandColors.text, foreground)] : []), foreground])
+  return {
+    primary,
+    primaryForeground,
+    background,
+    foreground,
+    muted,
+    mutedForeground: ensureContrast(sanitizeThemeColor(theme?.mutedForeground, '#57534e'), [background, card, muted]),
+    card,
+    border: sanitizeThemeColor(theme?.border, '#e0d9d0'),
+    accent: sanitizeThemeColor(theme?.accent, '#ece8e2'),
+  }
+}
+
+export const generateGlobalsCss = (brandColors: BrandColors, theme?: SiteTheme): string => {
+  const { primary, primaryForeground, background, foreground, muted, mutedForeground, card, border, accent } = resolvePalette(brandColors, theme)
   const cardRadius = sanitizeLength(theme?.cardRadius, '0.75rem')
   const buttonRadius = sanitizeLength(theme?.buttonRadius, '0.375rem')
   const headingTransform = theme?.headingTransform ?? 'none'
