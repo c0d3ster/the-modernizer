@@ -24,6 +24,7 @@ export const ICON_GUARDRAIL =
 
 export const PROVIDED_PRIMITIVES = `These files are generated deterministically and already correct — do NOT generate them, and do NOT redefine the components they export:
 - package.json, next.config.ts, tsconfig.json, postcss.config.mjs
+- src/app/layout.tsx (fonts, metadata and share tags, Navbar + <main> + Footer) and src/app/icon.svg (favicon)
 - src/app/globals.css — defines the full shadcn CSS variable theme (\`--color-primary\`, \`--color-card\`, \`--color-border\`, etc.) mapped from the site's brand colors, plus \`@layer base\` rules. It also sets the neutrals and corner radii for this business type, \`font-sans\` (body) and \`font-heading\` (h1-h3 use it automatically) from the next/font variables \`--font-body\` and \`--font-display\`, and \`--radius-button\` used by the Button primitive. Use Tailwind classes like \`bg-primary\`, \`text-primary-foreground\`, \`bg-card\`, \`border\`, \`bg-muted\`, \`text-muted-foreground\`, \`bg-accent\` throughout for consistent theming — do not invent your own color variables or write a competing global CSS reset.
 - src/lib/utils.ts (cn helper)
 - src/components/ui/button.tsx, badge.tsx, card.tsx, accordion.tsx, avatar.tsx, separator.tsx (shadcn primitives, with \`asChild\`/Slot support where applicable) — import them from \`@/components/ui/<name>\`, do not redeclare them

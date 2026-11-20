@@ -40,7 +40,7 @@ export const buildPagePrompt = (schema: SiteSchema, page: PageSchema, designSyst
 ${blocks}
 
 ## Additional Notes
-- The root layout (src/app/layout.tsx) already renders the Navbar and Footer around every page — do NOT render or import Navbar/Footer here, and do NOT import './globals.css' here
+- The root layout (src/app/layout.tsx) already renders the Navbar and Footer around every page and wraps the page in \`<main>\` — do NOT render or import Navbar/Footer here, do NOT use a \`<main>\` element (start with a fragment or \`<div>\`), and do NOT import './globals.css' here
 - If a \`hero\` block has a \`backgroundImageUrl\`, render it as a full-bleed background via \`next/image\` (\`fill\` + \`object-cover\`), not just a color
 
 ## Required File
@@ -51,7 +51,8 @@ Generate exactly one file: ${filePath} — the default-exported page component f
 - Use the brand colors meaningfully throughout — hero backgrounds, buttons, accents
 - Real content from the blocks above — no placeholders, no Lorem Ipsum, and no facts that are not in the content (see Facts above)
 - Every button must stay readable on its background: an outline or secondary button over a photo or dark section needs light text and a light border on a transparent background, never light text on a light fill
-- Semantic HTML, accessible (aria labels, alt text)
+- Semantic HTML, accessible (aria labels, alt text, a \`title\` on every \`<iframe>\`); headings go down one level at a time (h1, then h2, then h3)
+- Text stays readable: never fade text with opacity modifiers (\`text-white/70\`, \`text-primary-foreground/80\`); use \`text-muted-foreground\` on light surfaces and the full-strength foreground token on colored ones
 - Generous whitespace, strong visual hierarchy
 
 Call write_files with this one file.`,

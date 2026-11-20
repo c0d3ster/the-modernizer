@@ -4,6 +4,7 @@ import type { SiteSchema } from '@modernizer/schema'
 
 import { buildPagePrompt } from './page-prompt.js'
 import { buildShellPrompt } from './shell-prompt.js'
+import { generateClaudeLayout } from '../layout.js'
 
 const site = (overrides: Partial<SiteSchema>): SiteSchema => ({
   rootUrl: 'https://example.com/',
@@ -19,7 +20,8 @@ describe('vertical design direction in the Claude prompts', () => {
   it('gives a dental practice its own fonts, header and main action', () => {
     const { cached, task } = buildShellPrompt(site({ siteName: 'Valley Family Dentistry', nav: [{ label: 'New Patients', url: '/new-patients' }] }))
     expect(cached).toContain('## Design Direction (Dental and orthodontic practice)')
-    expect(task).toContain('`Playfair_Display` with `variable: \'--font-display\'`')
+    expect(generateClaudeLayout(site({ siteName: 'Valley Family Dentistry' }))).toContain("Playfair_Display({ subsets: ['latin'], display: 'swap', variable: '--font-display' })")
+    expect(task).toContain('Do NOT generate it')
     expect(task).toContain('"Book an appointment"')
     expect(task).toContain('(540) 555-0100 as a tap-to-call')
     expect(task).toContain('At most 6 top-level links')
