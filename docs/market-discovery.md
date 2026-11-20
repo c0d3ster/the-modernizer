@@ -29,6 +29,7 @@ Listed by how often their sites are neglected and how likely they are to pay:
 | Funeral homes | Very High | Medium | Conservative but image-conscious |
 | Yoga / Pilates / CrossFit studios | Medium | Medium | Visual product, often bootstrapped |
 | Veterinary clinics | High | Medium-High | Local monopoly-ish, loyal clients, neglected sites |
+| Landscaping / lawn care / tree service | Very High | Medium | Owner-operated crews, seasonal work, a project gallery sells the pitch |
 
 ---
 

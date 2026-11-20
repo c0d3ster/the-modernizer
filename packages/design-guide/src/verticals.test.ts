@@ -30,6 +30,12 @@ describe('detectVertical', () => {
     expect(detectVertical(site('Westside Animal Hospital', ['Dogs', 'Cats', 'Boarding']))).toBe('veterinary')
   })
 
+  it('reads a landscaper over home services', () => {
+    expect(detectVertical(site('Green Valley Landscaping', ['Lawn Care', 'Hardscaping', 'Patios', 'Residential', 'Contact']))).toBe('landscaping')
+    expect(detectVertical(site('Bayside Tree Service & Lawn', ['Tree Removal', 'Stump Grinding', 'Mulch']))).toBe('landscaping')
+    expect(detectVertical(site('Tidewater Plumbing', ['Drains', 'Water Heaters', 'Residential']))).toBe('home-services')
+  })
+
   it('falls back to general when nothing points to a vertical', () => {
     expect(detectVertical(site('Edgehill Recovery', ['About', 'Programs', 'Contact']))).toBe('general')
   })
@@ -49,6 +55,10 @@ describe('verticalFromBusinessType', () => {
     expect(verticalFromBusinessType('chiropractor')).toBe('chiropractic')
     expect(verticalFromBusinessType('personal injury attorney')).toBe('legal')
     expect(verticalFromBusinessType('veterinarian')).toBe('veterinary')
+    expect(verticalFromBusinessType('landscaper')).toBe('landscaping')
+    expect(verticalFromBusinessType('landscape contractor')).toBe('landscaping')
+    expect(verticalFromBusinessType('lawn care service')).toBe('landscaping')
+    expect(verticalFromBusinessType('tree service')).toBe('landscaping')
     expect(verticalFromBusinessType('carpet store')).toBe('general')
   })
 })

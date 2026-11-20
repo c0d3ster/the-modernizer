@@ -66,6 +66,7 @@ export const DEFAULT_BUSINESS_TYPES = [
   'dentist',
   'personal injury attorney',
   'veterinarian',
+  'landscaper',
 ]
 
 // Starter list of common national/regional chains, matched case-insensitively as a
