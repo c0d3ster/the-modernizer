@@ -50,8 +50,23 @@ describe('parseCandidatesCsv', () => {
   it('reads the vertical column, and older files written without it', () => {
     const row = 'A,,,,,https://a.example.com,50,false,false,,false,false,false,false,false,50,,,,,'
     expect(parseCandidatesCsv(`${HEADER}\n${row},plumber\n`)[0]?.vertical).toBe('plumber')
-    const legacyHeader = CANDIDATE_SCORE_COLUMNS.filter((c) => c !== 'vertical').join(',')
+    const legacyHeader = CANDIDATE_SCORE_COLUMNS.slice(0, CANDIDATE_SCORE_COLUMNS.indexOf('notes') + 1).join(',')
     expect(parseCandidatesCsv(`${legacyHeader}\n${row}\n`)[0]?.vertical).toBe('')
+  })
+
+  it('reads the composite columns, and files written before them', () => {
+    const row = 'A,,,,,https://a.example.com,62.5,false,false,,false,false,false,false,false,95,,,,,,plumber'
+    const withComposite = parseCandidatesCsv(`${HEADER}\n${row},55,70,9,true,140,77,60,true\n`)[0]
+    expect(withComposite).toMatchObject({ visual_points: 55, static_v2_score: 70, copyright_years_behind: 9, no_srcset: true, inline_styles: 140, psi_best_practices: 77, psi_code: 60, pitch: true })
+    const verticalOnly = CANDIDATE_SCORE_COLUMNS.slice(0, CANDIDATE_SCORE_COLUMNS.indexOf('vertical') + 1).join(',')
+    const older = parseCandidatesCsv(`${verticalOnly}\n${row}\n`)[0]
+    expect(older?.visual_points).toBeNull()
+    expect(older?.pitch).toBeNull()
+  })
+
+  it('rejects a header with columns out of order', () => {
+    const [first, second, ...rest] = CANDIDATE_SCORE_COLUMNS
+    expect(() => parseCandidatesCsv(`${[second, first, ...rest].join(',')}\n`)).toThrow('header')
   })
 
   it('rejects a header that does not match the column spec', () => {

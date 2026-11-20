@@ -24,20 +24,24 @@ const filler = (text: string): string => `<p>${text.repeat(20)}</p>`
 
 const SITES: Record<string, string> = {
   // Every static signal fires: table layout, old jQuery + WP theme, IE meta, no viewport/OG.
+  // Static v2 bottoms out too: a 2014 copyright, no srcset, and page-builder inline styles.
   '/old-diner/': `<html><head><title>Old Diner</title>
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <script src="/wp-content/themes/twentyfifteen/js/jquery-1.11.3.min.js"></script>
     </head><body><table><tr><td>Home</td><td>Menu</td></tr></table>
-    ${filler('Best diner food in town since 1985. ')}</body></html>`,
-  // Mobile-ready but no OG tags.
+    ${filler('Best diner food in town since 1985. ')}
+    ${'<span style="color:#900">Specials</span>'.repeat(150)}
+    <p>© 2014 Old Diner</p></body></html>`,
+  // Mobile-ready but no OG tags; copyright two years old and no responsive images.
   '/mid-plumber/': `<html><head><title>Mid Plumber</title>
     <meta name="viewport" content="width=device-width">
-    </head><body>${filler('Licensed plumbing for homes and businesses. ')}</body></html>`,
+    </head><body>${filler('Licensed plumbing for homes and businesses. ')}<p>© 2024 Mid Plumber</p></body></html>`,
   // Fully modern markup.
   '/modern-dental/': `<html><head><title>Modern Dental</title>
     <meta name="viewport" content="width=device-width">
     <meta property="og:title" content="Modern Dental">
-    </head><body>${filler('Gentle family dentistry with same-day appointments. ')}</body></html>`,
+    </head><body><img src="/smile.jpg" srcset="/smile.jpg 1x, /smile@2x.jpg 2x" alt="Smile">
+    ${filler('Gentle family dentistry with same-day appointments. ')}<p>© 2026 Modern Dental</p></body></html>`,
   // Too little visible text for staticFetch, so this candidate is unscoreable.
   '/thin-salon/': '<html><body><p>Coming soon</p></body></html>',
 }
@@ -107,7 +111,7 @@ describe('discovery pipeline (integration)', () => {
         SNAPSHOTS[new URL(`http://${lookupUrl}`).pathname] ?? [],
       fetchPsi: async (url) =>
         url.includes('modern-dental')
-          ? { performance: 95, seo: 100, accessibility: 98, score: 97.9 }
+          ? { performance: 95, seo: 100, accessibility: 98, score: 97.9, bestPractices: 100, code: 100 }
           : null,
       now: new Date('2026-10-04T00:00:00Z'),
     })
@@ -133,8 +137,10 @@ describe('discovery pipeline (integration)', () => {
       .slice(1)
       .map((line) => Number(line.split(',')[scoreColumn]))
     expect(scores).toEqual([...scores].sort((a, b) => a - b))
-    // Every static signal plus capped staleness fires: 100 - (20+20+20+12+10+10+5+3) = 0
+    // No PSI or visual score for the diner, so its composite is static v2 alone: 100 - (40+30+30) = 0
     expect(scores[0]).toBe(0)
+    expect(ranked[0]?.staticScore.score).toBe(0)
+    expect(ranked.map(({ pitch }) => pitch)).toEqual([true, true, false])
 
     const unreachablePath = path.join(outDir, 'unreachable.csv')
     await writeUnreachableCsv(unreachable, unreachablePath)

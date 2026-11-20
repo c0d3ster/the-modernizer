@@ -6,8 +6,9 @@
 // Stage 2: dedup by place_id, then route by website presence / review count / known chain.
 // Stage 3: fetch each continuing candidate's homepage (plain GET, no JS) and compute the
 // static sub-score, including SSL and Wayback staleness.
-// Stage 4: PageSpeed Insights categories when PSI_API_KEY is set (static-only otherwise).
-// Stage 5: rank by final score ascending and write candidates.csv.
+// Stage 4: PageSpeed Insights categories and build-quality audits when PSI_API_KEY is set, plus
+// the visual score (headless browser screenshots judged by Claude) when ANTHROPIC_API_KEY is set.
+// Stage 5: rank by the composite score ascending and write candidates.csv.
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -19,15 +20,20 @@ import {
   computeFinalScore,
   computeStaleness,
   computeStaticScore,
+  computeStaticV2,
   createRateLimiter,
+  createVisualScorer,
   fetchCdxSnapshots,
   fetchPsiScore,
 } from '@modernizer/discovery'
 import type {
   CdxSnapshot,
+  FinalScoreSignal,
   PsiScoreResult,
   StalenessSource,
   StaticScoreResult,
+  StaticV2Result,
+  VisualOutcome,
 } from '@modernizer/discovery'
 import { CANDIDATE_SCORE_COLUMNS } from '@modernizer/schema'
 import { z } from 'zod'
@@ -452,18 +458,26 @@ export const toWaybackLookupUrl = (url: string): string => {
 }
 
 export interface ScoredCandidate extends ContinuingCandidate {
+  // Composite (docs/market-discovery.md "Final score formula"); lower = better prospect
   score: number
+  pitch: boolean
+  // Composite signals that were unavailable for this site
+  missing: FinalScoreSignal[]
   psiAvailable: boolean
   staticScore: StaticScoreResult
+  staticV2: StaticV2Result
   lastChanged: string | null
   stalenessSource: StalenessSource
   psi: PsiScoreResult | null
+  visual: VisualOutcome | null
 }
 
 export interface ScoringOptions {
   fetchPage?: (url: string) => Promise<StaticFetchResult | null>
   fetchSnapshots?: (url: string) => Promise<CdxSnapshot[]>
   fetchPsi?: (url: string) => Promise<PsiScoreResult | null>
+  // Screenshots the site and scores it with Claude; omitted = no visual score
+  scoreVisual?: (url: string, slug: string) => Promise<VisualOutcome | null>
   concurrency?: number
   now?: Date
   onProgress?: (event: ScoringProgress) => void
@@ -483,12 +497,17 @@ export interface ScoringResult {
   unreachable: ContinuingCandidate[]
 }
 
+// File-name-safe screenshot prefix, e.g. "Brant Plumbing & Heating" -> "brant-plumbing-heating"
+export const candidateSlug = (name: string): string =>
+  name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'site'
+
 export const scoreCandidate = async (
   candidate: ContinuingCandidate,
   {
     fetchPage = staticFetch,
     fetchSnapshots = fetchCdxSnapshots,
     fetchPsi = fetchPsiScore,
+    scoreVisual,
     now = new Date(),
   }: ScoringOptions = {}
 ): Promise<ScoredCandidate | null> => {
@@ -506,18 +525,24 @@ export const scoreCandidate = async (
     stalenessWeight: staleness.stalenessWeight,
   })
 
-  // Stage 4: PSI. fetchPsiScore returns null without a key or on any failure.
-  const psi = await fetchPsi(homepage.url)
-  const final = computeFinalScore({ staticScore: staticScore.score, psiScore: psi })
+  const staticV2 = computeStaticV2({ html: homepage.html, now })
+
+  // Stage 4: PSI and the visual score run side by side. Both return null when unavailable.
+  const [psi, visual] = await Promise.all([fetchPsi(homepage.url), scoreVisual ? scoreVisual(homepage.url, candidateSlug(candidate.name)) : null])
+  const final = computeFinalScore({ visual: visual?.points ?? null, staticScore: staticV2.score, psiScore: psi })
 
   return {
     ...candidate,
     score: final.score,
+    pitch: final.pitch,
+    missing: final.missing,
     psiAvailable: final.psiAvailable,
     staticScore,
+    staticV2,
     lastChanged: staleness.lastChanged,
     stalenessSource: staleness.source,
     psi,
+    visual,
   }
 }
 
@@ -577,13 +602,17 @@ const buildCandidateNotes = (candidate: ScoredCandidate): string => {
   if (candidate.stalenessSource === 'copyright-fallback') {
     parts.push('staleness: copyright fallback (no Wayback data)')
   }
-  if (!candidate.psiAvailable) parts.push('psi: unavailable, static-only score')
+  if (!candidate.psiAvailable) parts.push('psi: unavailable')
+  if (!candidate.visual) parts.push('visual: unavailable')
+  if (candidate.missing.length) parts.push(`composite without: ${candidate.missing.join(' ')}`)
   return parts.join(', ')
 }
 
+const orEmpty = (value: number | null | undefined): number | '' => (value === null || value === undefined ? '' : roundScore(value))
+
 export const candidatesToCsv = (candidates: ScoredCandidate[]): string => {
   const rows = candidates.map((candidate) => {
-    const { staticScore, psi } = candidate
+    const { staticScore, staticV2, psi } = candidate
     return toCsvRow([
       candidate.name,
       candidate.phone,
@@ -607,6 +636,14 @@ export const candidatesToCsv = (candidates: ScoredCandidate[]): string => {
       psi ? roundScore(psi.accessibility) : '',
       buildCandidateNotes(candidate),
       candidate.vertical,
+      orEmpty(candidate.visual?.points),
+      roundScore(staticV2.score),
+      staticV2.copyrightYearsBehind ?? '',
+      staticV2.noSrcset,
+      staticV2.inlineStyles,
+      orEmpty(psi?.bestPractices),
+      orEmpty(psi?.code),
+      candidate.pitch,
     ])
   })
   return [toCsvRow([...CANDIDATES_CSV_HEADER]), ...rows].join('\n') + '\n'
@@ -687,6 +724,8 @@ interface CliOptions {
   outDir: string
   fromCandidates?: string
   concurrency: string
+  // commander turns --no-visual into visual: false
+  visual: boolean
 }
 
 const program = new Command()
@@ -705,6 +744,7 @@ program
     'Skip Stages 1-2 and score a continuing-candidates.json from a previous run (no Places API cost)'
   )
   .option('--concurrency <n>', 'Candidates scored in parallel', String(DEFAULT_SCORING_CONCURRENCY))
+  .option('--no-visual', 'Skip the visual score (no browser, no Claude cost); the composite uses the other signals')
 
 const loadCandidates = async (
   opts: CliOptions
@@ -751,16 +791,27 @@ program.action(async (opts: CliOptions) => {
     const candidates = await loadCandidates(opts)
 
     if (!process.env['PSI_API_KEY']) {
-      process.stderr.write('PSI_API_KEY is not set: scores will be static-only.\n')
+      process.stderr.write('PSI_API_KEY is not set: the composite will leave out the PSI signals.\n')
     }
+    const useVisual = opts.visual && Boolean(process.env['ANTHROPIC_API_KEY'])
+    if (opts.visual && !useVisual) {
+      process.stderr.write('ANTHROPIC_API_KEY is not set: the composite will leave out the visual score.\n')
+    }
+    const visualScorer = useVisual
+      ? createVisualScorer({
+          screenshotDir: path.join(opts.outDir, 'shots'),
+          onError: (url, message) => process.stderr.write(`  visual score failed for ${url}: ${message}\n`),
+        })
+      : null
 
     const { ranked, unreachable } = await scoreCandidates(candidates, {
       concurrency,
+      ...(visualScorer && { scoreVisual: visualScorer.score }),
       onProgress: ({ candidate, completed, total, scored }) => {
-        const outcome = scored ? `score ${roundScore(scored.score)}` : 'unreachable, skipped'
+        const outcome = scored ? `score ${roundScore(scored.score)}${scored.pitch ? ' (pitch)' : ''}` : 'unreachable, skipped'
         process.stderr.write(`[${completed}/${total}] ${candidate.name}: ${outcome}\n`)
       },
-    })
+    }).finally(() => visualScorer?.close())
 
     const candidatesPath = path.join(opts.outDir, 'candidates.csv')
     await writeCandidatesCsv(ranked, candidatesPath)
@@ -768,6 +819,8 @@ program.action(async (opts: CliOptions) => {
     process.stdout.write(
       `Scored ${ranked.length} candidate(s) -> ${candidatesPath}` +
         (unreachable.length ? ` (${unreachable.length} unreachable, skipped)` : '') +
+        `, ${ranked.filter((c) => c.pitch).length} to pitch` +
+        (visualScorer ? `, visual scoring cost $${visualScorer.costUsd().toFixed(2)}` : '') +
         '\n'
     )
   } catch (err) {

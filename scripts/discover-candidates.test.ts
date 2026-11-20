@@ -412,12 +412,12 @@ const baseCandidate: ContinuingCandidate = {
 const MODERN_HTML = `<html><head>
   <meta name="viewport" content="width=device-width">
   <meta property="og:title" content="Modern">
-</head><body><p>Modern site</p></body></html>`
+</head><body><img src="a.jpg" srcset="a.jpg 1x, a@2x.jpg 2x" alt=""><p>Modern site</p><p>© 2026 Good Plumbing</p></body></html>`
 
 describe('scoreCandidate', () => {
   const now = new Date('2026-01-01T00:00:00Z')
 
-  it('returns a static-only score when PSI is unavailable', async () => {
+  it('scores on static v2 alone when PSI and the visual score are unavailable', async () => {
     const scored = await scoreCandidate(baseCandidate, {
       fetchPage: async (url) => fetchResult(url, MODERN_HTML),
       fetchSnapshots: async () => [],
@@ -427,20 +427,28 @@ describe('scoreCandidate', () => {
 
     expect(scored?.psiAvailable).toBe(false)
     expect(scored?.score).toBe(100)
+    expect(scored?.pitch).toBe(false)
+    expect(scored?.staticV2.score).toBe(100)
     expect(scored?.staticScore.score).toBe(100)
+    expect(scored?.missing).toEqual(['visual', 'code', 'seo', 'accessibility', 'bestPractices'])
     expect(scored?.stalenessSource).toBe('none')
   })
 
-  it('combines static and PSI categories at 25% each', async () => {
+  it('combines visual at half with static v2 and the PSI signals at a tenth each', async () => {
+    const scoreVisual = vi.fn(async () => ({ points: 50, costUsd: 0.03 }))
     const scored = await scoreCandidate(baseCandidate, {
       fetchPage: async (url) => fetchResult(url, MODERN_HTML),
       fetchSnapshots: async () => [],
-      fetchPsi: async () => ({ performance: 40, seo: 60, accessibility: 80, score: 61 }),
+      fetchPsi: async () => ({ performance: 40, seo: 60, accessibility: 80, score: 61, bestPractices: 90, code: 70 }),
+      scoreVisual,
       now,
     })
 
+    expect(scoreVisual).toHaveBeenCalledWith('https://goodplumbing.example.com', 'good-plumbing-co')
     expect(scored?.psiAvailable).toBe(true)
-    expect(scored?.score).toBe(100 * 0.25 + 40 * 0.25 + 60 * 0.25 + 80 * 0.25)
+    expect(scored?.score).toBeCloseTo(0.5 * 50 + 0.1 * (100 + 70 + 60 + 80 + 90))
+    expect(scored?.pitch).toBe(true)
+    expect(scored?.missing).toEqual([])
   })
 
   it('looks up staleness on the fetched URL without query params', async () => {
@@ -474,7 +482,11 @@ describe('scoreCandidate', () => {
 const scoredFixture = (overrides: Partial<ScoredCandidate> = {}): ScoredCandidate => ({
   ...baseCandidate,
   score: 50,
+  pitch: true,
+  missing: ['visual', 'code', 'seo', 'accessibility', 'bestPractices'],
   psiAvailable: false,
+  staticV2: { score: 60, copyrightYearsBehind: null, noSrcset: true, inlineStyles: 0 },
+  visual: null,
   staticScore: {
     score: 50,
     noSsl: false,
@@ -508,7 +520,7 @@ describe('scoreCandidates', () => {
   it('ranks reachable candidates and separates unreachable ones', async () => {
     const pages: Record<string, string> = {
       'https://modern.example.com': MODERN_HTML,
-      'https://old.example.com': '<html><body><table><tr><td>Old</td></tr></table></body></html>',
+      'https://old.example.com': '<html><body><table><tr><td>Old</td></tr></table><p>© 2015 Old</p></body></html>',
     }
     const progress: number[] = []
 
@@ -542,16 +554,20 @@ describe('candidatesToCsv', () => {
     expect(header).toBe(
       'business_name,phone,address,city,state,url,score,no_ssl,no_viewport,last_changed,' +
         'old_jquery,old_wp_theme,no_og_tags,table_layout,ie_compatible,static_score,' +
-        'psi_score,psi_performance,psi_seo,psi_accessibility,notes,vertical'
+        'psi_score,psi_performance,psi_seo,psi_accessibility,notes,vertical,' +
+        'visual_points,static_v2_score,copyright_years_behind,no_srcset,inline_styles,' +
+        'psi_best_practices,psi_code,pitch'
     )
   })
 
-  it('leaves PSI columns empty and notes static-only when PSI is unavailable', () => {
+  it('leaves PSI and visual columns empty and notes what the composite left out', () => {
     const [, row] = candidatesToCsv([scoredFixture()]).split('\n')
     expect(row).toBe(
       'Good Plumbing Co,(512) 555-0101,"1 Good St, Austin, TX",Austin,TX,' +
         'https://goodplumbing.example.com,50,false,true,,false,false,true,false,false,50,' +
-        ',,,,"no_viewport, no_og_tags, psi: unavailable, static-only score",plumber'
+        ',,,,"no_viewport, no_og_tags, psi: unavailable, visual: unavailable, ' +
+        'composite without: visual code seo accessibility bestPractices",plumber,' +
+        ',60,,true,0,,,true'
     )
   })
 
@@ -561,7 +577,8 @@ describe('candidatesToCsv', () => {
         address: '1 Good St',
         score: 47.123,
         psiAvailable: true,
-        psi: { performance: 41.5, seo: 92, accessibility: 77.77, score: 72.58 },
+        psi: { performance: 41.5, seo: 92, accessibility: 77.77, score: 72.58, bestPractices: 96.04, code: 60 },
+        visual: { points: 41, costUsd: 0.03 },
         lastChanged: '2019-04-02',
         stalenessSource: 'wayback',
       }),
@@ -571,6 +588,7 @@ describe('candidatesToCsv', () => {
     expect(cells[6]).toBe('47.1')
     expect(cells[9]).toBe('2019-04-02')
     expect(row).toContain(',72.6,41.5,92,77.8,')
+    expect(row?.endsWith(',41,60,,true,0,96,60,true')).toBe(true)
   })
 })
 

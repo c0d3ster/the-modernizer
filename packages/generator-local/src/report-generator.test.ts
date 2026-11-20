@@ -38,10 +38,10 @@ const nav = [
   { label: 'Menu', url: '/menu' },
 ]
 
-// Hand-written candidates.csv rows (no live pipeline run): one with PSI data, one
-// static-only with no Wayback history.
+// Hand-written candidates.csv rows (no live pipeline run): one with every composite signal, one
+// written before the composite columns existed (no PSI, no Wayback history).
 const FIXTURE_CSV = `${CANDIDATE_SCORE_COLUMNS.join(',')}
-Rosa's Diner,(512) 555-0101,"12 Main St, Austin, TX",Austin,TX,https://rosasdiner.example.com,38.5,true,true,2016-03-01,true,true,false,true,false,22,63.4,41,72,77,"no_ssl, no_viewport, staleness_weight: 20"
+Rosa's Diner,(512) 555-0101,"12 Main St, Austin, TX",Austin,TX,https://rosasdiner.example.com,38.5,true,true,2016-03-01,true,true,false,true,false,22,63.4,41,72,77,"no_ssl, no_viewport, staleness_weight: 20",restaurant,30,40,9,true,160,77,55,true
 Rosa's Diner,(512) 555-0101,12 Main St,Austin,TX,https://rosasdiner.example.com,55,false,true,,false,false,true,false,true,55,,,,,"no_viewport, psi: unavailable, static-only score"
 `
 
@@ -83,14 +83,17 @@ describe('generateReport', () => {
 
     expect(report).toContain('## Modernization Score')
     expect(report).toContain('**38.5 / 100**')
-    expect(report).toContain('Strong candidate')
-    expect(report).toContain('| Static HTML | 22 | 25% |')
-    expect(report).toContain('| Performance (Lighthouse, mobile) | 41 | 25% |')
-    expect(report).toContain('| SEO (Lighthouse) | 72 | 25% |')
-    expect(report).toContain('| Accessibility (Lighthouse) | 77 | 25% |')
-    expect(report).toContain(
-      'PSI composite (informational, not part of the final score): 63.4'
-    )
+    expect(report).toContain('Pitch candidate: below the pitch threshold of 81')
+    expect(report).toContain('| Visual design (screenshots) | 30 | 50% |')
+    expect(report).toContain('| Static HTML | 40 | 10% |')
+    expect(report).toContain('| Build quality (Lighthouse audits) | 55 | 10% |')
+    expect(report).toContain('| SEO (Lighthouse) | 72 | 10% |')
+    expect(report).toContain('| Accessibility (Lighthouse) | 77 | 10% |')
+    expect(report).toContain('| Best Practices (Lighthouse) | 77 | 10% |')
+    expect(report).toContain('Not in the score: Lighthouse performance (mobile) 41, legacy static HTML score 22.')
+    expect(report).not.toContain('reweighted')
+    expect(report).toContain('| Years since the copyright year | 9 |')
+    expect(report).toContain('| Inline style attributes | 160 |')
     expect(report).toContain('| No HTTPS / expired SSL | Yes |')
     expect(report).toContain('| No Open Graph tags | No |')
     expect(report).toContain('Content last changed **2016-03-01**')
@@ -106,23 +109,25 @@ describe('generateReport', () => {
     )
   })
 
-  it('renders a static-only score without PSI or Wayback data', () => {
+  it('renders a row from before the composite columns, without PSI or Wayback data', () => {
     const report = generateReport(schema, nav, scoredStaticOnly)
 
     expect(report).toContain('**55 / 100**')
-    expect(report).toContain('Moderate candidate')
-    expect(report).toContain('| Performance (Lighthouse, mobile) | n/a | 25% |')
-    expect(report).toContain('the final score is the static HTML score alone')
-    expect(report).not.toContain('PSI composite')
+    expect(report).toContain('Pitch candidate')
+    expect(report).toContain('| Visual design (screenshots) | n/a | 50% |')
+    expect(report).toContain('| SEO (Lighthouse) | n/a | 10% |')
+    expect(report).toContain('the others were reweighted to fill their share')
+    expect(report).toContain('Not in the score: legacy static HTML score 55.')
+    expect(report).toContain('| No responsive images (srcset) | n/a |')
     expect(report).toContain('No Wayback Machine history')
     expect(report).toContain('| IE compatibility meta tag | Yes |')
   })
 
-  it('labels high scores as already modern', () => {
+  it('labels a score at or above the threshold as already fairly modern', () => {
     const report = generateReport(schema, nav, {
       ...scoredStaticOnly,
-      score: 82,
+      score: 81,
     })
-    expect(report).toContain('Already fairly modern')
+    expect(report).toContain('Above the pitch threshold of 81: already fairly modern')
   })
 })

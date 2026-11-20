@@ -210,16 +210,21 @@ Stage 2 — Route by website presence
   ↓
 Stage 3 — HTML fetch + static scoring
   → fetch homepage HTML (plain GET, no JS)
-  → score against static signals (viewport, copyright, WP theme, OG tags, tables, SSL, old jQuery, IE meta)
+  → static v2 (copyright year, responsive images, inline styles) feeds the composite
+  → the original static signals (viewport, WP theme, OG tags, tables, SSL, old jQuery, IE meta)
+    are still reported as talking points
   ↓
-Stage 4 — Lighthouse / PSI scoring
-  → call PSI API for mobile performance, SEO, and accessibility scores
+Stage 4 — Lighthouse / PSI and visual scoring, side by side
+  → one PSI call per site: SEO, accessibility and Best Practices categories plus five
+    build-quality audits (needs PSI_API_KEY)
   → adds several seconds up to ~60s per URL (a full Lighthouse run, not a
     lightweight call — verified live against amazon.com at ~52s, which is why
     fetchPsiScore's timeout is 60s; small brochure sites finish well under that)
+  → visual score: headless-browser screenshots judged by Claude against the design rubric
+    (needs ANTHROPIC_API_KEY, about $0.03 per site, skip with --no-visual)
   ↓
 Stage 5 — Output ranked CSV
-  → sort by score ascending (lowest = best prospect)
+  → sort by the composite ascending (lowest = best prospect); pitch = composite below 81
   → top 20 feed directly into the modernizer pipeline → candidates.csv
 ```
 
@@ -235,28 +240,62 @@ Stage 5 — Output ranked CSV
 
 ## Site Scoring Rubric
 
-Scores work like Lighthouse: **100 = perfectly modern site**, **0 = completely outdated**. Lower scores are better prospects.
+Scores work like Lighthouse: **100 = perfectly modern site**, **0 = completely outdated**. Lower scores are better prospects. Scores are absolute: never normalized per market or per vertical.
 
-Scoring uses **four independent automated signals**, each weighted equally, combined into a final score. Each signal is normalized to 0-100, so the total can never go out of range. All signals are fully automated — no human review step, making results consistent across runs.
+Scoring combines **six automated signals**, each 0-100, into one composite. The visual score carries half; the other five carry a tenth each. All signals are automated, with no human review step.
 
 ### Final score formula
 
 ```
-final = (static_score × 0.25) + (performance × 0.25) + (seo × 0.25) + (accessibility × 0.25)
+final = visual × 0.5
+      + static_v2 × 0.1
+      + code × 0.1            (Lighthouse build-quality audits)
+      + seo × 0.1
+      + accessibility × 0.1
+      + best_practices × 0.1
 ```
 
-Performance carries full weight alongside SEO and accessibility — outdated hosting/deployment is itself a fixable modernization pitch (e.g. migrating to Vercel, moving off a legacy stack), not just a neutral signal to discount.
+**Pitch when `final` is below 81.** The weights and cutoff live in `@modernizer/schema` (`COMPOSITE_WEIGHTS`, `PITCH_THRESHOLD`) so the scorer and the modernization report share them.
 
-**Thresholds:**
-- **≤ 40** — strong candidate, clear visual case for modernization
-- **41-60** — moderate candidate, worth a closer look
-- **61+** — already modern enough that a pitch is hard to make
+**Missing signals** (no `PSI_API_KEY`, a failed PSI call, no `ANTHROPIC_API_KEY`, a site that blocks the browser) drop out, and the remaining weights are scaled up to fill their share, so the score stays on the 0-100 scale. The `notes` column says which signals were left out.
+
+**How it was chosen.** On the Winchester rating bench (47 hand-rated sites, 24 rated "pitch: yes", live PSI), the old formula (static plus performance, SEO and accessibility at 25% each) barely predicted the hand ratings: a site rated "yes" scored below a "no" only 53% of the time (AUC 0.53, where 0.5 is a coin flip). Raw Lighthouse performance pointed the wrong way (0.45), because polished sites carry video heroes and big photos. This composite reaches 0.92 on the same bench, with 91% of the sites it flags rated "yes". The non-visual signals keep real weight because the generators raise every one of them, so they also show the lift a rebuild gives: on 15 rebuilt sites the composite rose by 19 points on average and every rebuild cleared 81. Recheck the cutoff once a second city is rated.
 
 ---
 
-### Sub-score 1: Static HTML (25% weight)
+### Sub-score: Visual design (50% weight)
 
-Fast checks against raw HTML — no browser, no API key. Each signal has a weight. The sub-score is calculated as:
+`scoreSiteVisually` in `@modernizer/discovery`: a headless browser (Playwright) loads the homepage at laptop, phone and small-laptop sizes, measures layout facts (header bands, a pinned header, sideways scroll), and takes screenshots. Claude scores them against the design rubric in `@modernizer/design-guide`: it lists rule findings, a second pass rechecks them against each rule's exceptions, and the 100-point score is computed in code from the rule deductions, never by the model. About $0.03 per site. A site that serves a bot check, fails to load, or that the model marks unassessable gets no visual score.
+
+If Playwright's expected Chromium build isn't installed, point `MODERNIZER_CHROMIUM_PATH` at an installed `chrome-headless-shell.exe`.
+
+---
+
+### Sub-score: Static HTML v2 (10% weight)
+
+Three HTML checks that tracked the hand ratings, where the original static signals below almost never fire on today's small-business sites:
+
+```
+static_v2 = 100
+          − 40 × min(copyright_years_behind / 4, 1)     (no copyright line counts as 1 year)
+          − 30 × (no img/source with srcset)
+          − 30 × min(inline_style_attributes / 150, 1)
+```
+
+| Signal | Bench AUC alone |
+|---|---|
+| Years since the newest copyright year | 0.67 |
+| No responsive images (`srcset`) | 0.62 |
+| Inline `style=` attribute count | 0.61 |
+| Combined (static v2) | 0.73 |
+
+The thresholds were picked on the same bench, so 0.73 is optimistic.
+
+---
+
+### Original static signals (reported, not in the score)
+
+These are still computed and written to `candidates.csv` (`static_score` and the boolean columns) because they make good talking points ("your site has no HTTPS"), but they don't count toward the composite: on the bench the combined score predicted the hand ratings at 0.59, `ie_compatible` was noise (0.49) and `no_og_tags` pointed the wrong way (0.43). Fast checks against raw HTML, with no browser or API key. Each signal has a weight. The legacy sub-score is calculated as:
 
 ```
 static_score = 100 × (1 − fired_weight / total_weight)
@@ -307,7 +346,7 @@ If Wayback has **no data** for the URL, fall back to the copyright year regex (`
 
 ---
 
-### Sub-scores 2-4: Lighthouse / PSI (25% weight each)
+### Sub-scores: Lighthouse / PSI (10% weight each for build quality, SEO, accessibility and Best Practices)
 
 Lighthouse is the open-source audit engine built into Chrome DevTools (Lighthouse tab). The PageSpeed Insights API runs the same engine server-side — no browser required, just an HTTP call.
 
@@ -321,12 +360,15 @@ GET https://www.googleapis.com/pagespeedonline/v5/runPagespeed
   &category=performance
   &category=seo
   &category=accessibility
+  &category=best-practices
 ```
 
-**Key response fields** (each feeds directly into the final score at 25% weight, after multiplying by 100 to bring it into the 0-100 range):
-- `lighthouseResult.categories.performance.score` — multiply by 100
-- `lighthouseResult.categories.seo.score` — multiply by 100
-- `lighthouseResult.categories.accessibility.score` — multiply by 100
+**Key response fields** (each multiplied by 100 to bring it into the 0-100 range):
+- `lighthouseResult.categories.seo.score`: SEO, 10%
+- `lighthouseResult.categories.accessibility.score`: accessibility, 10%
+- `lighthouseResult.categories['best-practices'].score`: Best Practices, 10%
+- `lighthouseResult.audits[...]`: build quality (`code`), 10%: the mean score of five audits that show how the page is built rather than how much media it carries: `legacy-javascript-insight`, `font-display-insight`, `duplicated-javascript-insight`, `bootup-time`, `unsized-images` (older Lighthouse ids without `-insight` are read too; an audit Lighthouse skipped counts as passed). On the bench this held up at about 0.62 on held-out sites.
+- `lighthouseResult.categories.performance.score`: reported in `psi_performance`, **not** in the score (see "How it was chosen")
 
 **Reported `psi_score` column:** the CSV still reports a weighted composite of the three categories for convenience, with SEO and accessibility weighted higher than raw performance within that composite:
 
@@ -334,7 +376,7 @@ GET https://www.googleapis.com/pagespeedonline/v5/runPagespeed
 psi_score = (performance × 0.30) + (seo × 0.40) + (accessibility × 0.30)
 ```
 
-This composite is informational only — it is not part of the final score formula above, which weights performance, SEO, and accessibility independently at 25% each.
+This composite is informational only; it is not part of the final score formula above.
 
 **Cost:** Free with a Google Cloud API key. Rate limit: 25,000 queries/day.
 
@@ -387,7 +429,7 @@ Businesses with an existing website, sorted by modernity score ascending — low
 | `city` | string | City |
 | `state` | string | State |
 | `url` | string | Homepage URL |
-| `score` | 0-100 | Modernity score — lower is a better prospect |
+| `score` | 0-100 | Composite modernity score (see "Final score formula"); lower is a better prospect |
 | `no_ssl` | boolean | HTTPS fetch failed or cert error |
 | `no_viewport` | boolean | Missing viewport meta tag |
 | `last_changed` | date | True last-updated date from Wayback CDX |
@@ -396,13 +438,23 @@ Businesses with an existing website, sorted by modernity score ascending — low
 | `no_og_tags` | boolean | No Open Graph meta tags |
 | `table_layout` | boolean | Tables used for page layout |
 | `ie_compatible` | boolean | X-UA-Compatible meta tag present |
-| `static_score` | 0-100 | Normalized static HTML sub-score |
+| `static_score` | 0-100 | Original static HTML sub-score (reported, not in the composite) |
 | `psi_score` | 0-100 | Weighted Lighthouse sub-score (performance 30%, SEO 40%, accessibility 30%) |
-| `psi_performance` | 0-100 | Raw Lighthouse mobile performance score |
+| `psi_performance` | 0-100 | Raw Lighthouse mobile performance score (reported, not in the composite) |
 | `psi_seo` | 0-100 | Raw Lighthouse SEO score |
 | `psi_accessibility` | 0-100 | Raw Lighthouse accessibility score |
 | `notes` | string | Details — e.g. "wp-theme: twentyfifteen, copyright: 2016" |
 | `vertical` | string | Business type of the Places query that found it (e.g. `plumber`). Used to pick the generator's design profile. Older files without this column still parse. |
+| `visual_points` | 0-100 | Visual design score; empty when it didn't run or couldn't see the site |
+| `static_v2_score` | 0-100 | Static HTML v2 sub-score |
+| `copyright_years_behind` | integer | Years since the newest copyright year; empty when the page has none |
+| `no_srcset` | boolean | No responsive images on the homepage |
+| `inline_styles` | integer | Count of inline `style=` attributes |
+| `psi_best_practices` | 0-100 | Lighthouse Best Practices score |
+| `psi_code` | 0-100 | Build-quality audit score |
+| `pitch` | boolean | Composite below the pitch threshold (81) |
+
+Columns are only ever appended, so files written before a column existed still parse (missing trailing columns read as empty).
 
 ### `greenfield-leads.csv`
 
