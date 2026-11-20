@@ -94,6 +94,7 @@ const fakePlacesFetch = (): typeof fetch =>
         rating: 4.5,
         nationalPhoneNumber: `(512) 555-010${index}`,
         formattedAddress: `${index} Main St`,
+        location: { latitude: 36.85 + index / 100, longitude: -75.98 },
       })),
     }),
   })) as unknown as typeof fetch
@@ -130,6 +131,8 @@ describe('discovery pipeline (integration)', () => {
 
     const lines = (await readFile(csvPath, 'utf-8')).trim().split('\n')
     expect(lines[0]).toBe(CANDIDATES_CSV_HEADER.join(','))
+    // Map pins come through from Places to the last two columns
+    expect(lines.slice(1).every((line) => /,36\.8\d*,-75\.98$/.test(line))).toBe(true)
     expect(lines).toHaveLength(4)
 
     const scoreColumn = CANDIDATES_CSV_HEADER.indexOf('score')

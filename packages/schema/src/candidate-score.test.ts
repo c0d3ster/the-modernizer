@@ -64,6 +64,14 @@ describe('parseCandidatesCsv', () => {
     expect(older?.pitch).toBeNull()
   })
 
+  it('reads map coordinates and rejects impossible ones', () => {
+    const row = 'A,,,,,https://a.example.com,62.5,false,false,,false,false,false,false,false,95,,,,,,plumber,55,70,9,true,140,77,60,true'
+    const [withCoords] = parseCandidatesCsv(`${HEADER}\n${row},36.8529,-75.978\n`)
+    expect(withCoords).toMatchObject({ latitude: 36.8529, longitude: -75.978 })
+    expect(parseCandidatesCsv(`${HEADER}\n${row},,\n`)[0]?.latitude).toBeNull()
+    expect(() => parseCandidatesCsv(`${HEADER}\n${row},136.8,-75.9\n`)).toThrow('row 2')
+  })
+
   it('rejects a header with columns out of order', () => {
     const [first, second, ...rest] = CANDIDATE_SCORE_COLUMNS
     expect(() => parseCandidatesCsv(`${[second, first, ...rest].join(',')}\n`)).toThrow('header')

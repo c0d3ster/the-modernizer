@@ -50,6 +50,8 @@ const PLACES_FIELD_MASK = [
   'places.rating',
   'places.nationalPhoneNumber',
   'places.formattedAddress',
+  // Map pins for the lead map; same Text Search call, no extra request
+  'places.location',
   'nextPageToken',
 ].join(',')
 
@@ -135,6 +137,7 @@ const PlacesTextSearchPlaceSchema = z.object({
   rating: z.number().optional(),
   nationalPhoneNumber: z.string().optional(),
   formattedAddress: z.string().optional(),
+  location: z.object({ latitude: z.number(), longitude: z.number() }).optional(),
 })
 
 // `places` is omitted entirely (not an empty array) when a query has no matches.
@@ -151,6 +154,8 @@ export interface RawPlaceResult {
   rating: number | null
   phone: string
   address: string
+  latitude: number | null
+  longitude: number | null
 }
 
 const mapTextSearchPlace = (
@@ -163,6 +168,8 @@ const mapTextSearchPlace = (
   rating: place.rating ?? null,
   phone: place.nationalPhoneNumber ?? '',
   address: place.formattedAddress ?? '',
+  latitude: place.location?.latitude ?? null,
+  longitude: place.location?.longitude ?? null,
 })
 
 const fetchTextSearchPage = async (
@@ -277,10 +284,14 @@ export interface ContinuingCandidate {
   state: string
   // Business type of the Places query that found it, e.g. "plumber"
   vertical: string
+  // From Places; null for handoff files written before coordinates were kept
+  latitude: number | null
+  longitude: number | null
 }
 
 // Matches the doc's greenfield-leads.csv schema exactly:
-// business_name, phone, address, city, state, vertical, review_count, rating, place_id.
+// business_name, phone, address, city, state, vertical, review_count, rating, place_id,
+// latitude, longitude.
 export interface GreenfieldLead {
   businessName: string
   phone: string
@@ -291,6 +302,8 @@ export interface GreenfieldLead {
   reviewCount: number
   rating: number | null
   placeId: string
+  latitude: number | null
+  longitude: number | null
 }
 
 export interface DiscoveryResult {
@@ -339,6 +352,8 @@ export const runDiscovery = async (
       city: config.city,
       state: config.state,
       vertical: record.vertical,
+      latitude: record.latitude,
+      longitude: record.longitude,
     })
   )
 
@@ -353,6 +368,8 @@ export const runDiscovery = async (
       reviewCount: record.reviewCount,
       rating: record.rating,
       placeId: record.placeId,
+      latitude: record.latitude,
+      longitude: record.longitude,
     })
   )
 
@@ -377,6 +394,8 @@ const GREENFIELD_CSV_HEADER = [
   'review_count',
   'rating',
   'place_id',
+  'latitude',
+  'longitude',
 ]
 
 export const greenfieldLeadsToCsv = (leads: GreenfieldLead[]): string => {
@@ -391,6 +410,8 @@ export const greenfieldLeadsToCsv = (leads: GreenfieldLead[]): string => {
       lead.reviewCount,
       lead.rating ?? '',
       lead.placeId,
+      lead.latitude ?? '',
+      lead.longitude ?? '',
     ])
   )
   return [toCsvRow(GREENFIELD_CSV_HEADER), ...rows].join('\n') + '\n'
@@ -644,6 +665,8 @@ export const candidatesToCsv = (candidates: ScoredCandidate[]): string => {
       orEmpty(psi?.bestPractices),
       orEmpty(psi?.code),
       candidate.pitch,
+      candidate.latitude ?? '',
+      candidate.longitude ?? '',
     ])
   })
   return [toCsvRow([...CANDIDATES_CSV_HEADER]), ...rows].join('\n') + '\n'
@@ -668,6 +691,8 @@ export const UNREACHABLE_CSV_HEADER = [
   'url',
   'review_count',
   'place_id',
+  'latitude',
+  'longitude',
 ] as const
 
 export const unreachableToCsv = (candidates: ContinuingCandidate[]): string => {
@@ -681,6 +706,8 @@ export const unreachableToCsv = (candidates: ContinuingCandidate[]): string => {
       candidate.website,
       candidate.reviewCount,
       candidate.placeId,
+      candidate.latitude ?? '',
+      candidate.longitude ?? '',
     ])
   )
   return [toCsvRow([...UNREACHABLE_CSV_HEADER]), ...rows].join('\n') + '\n'
@@ -707,6 +734,9 @@ const ContinuingCandidatesFileSchema = z.array(
     state: z.string(),
     // Files written before the vertical was kept have no field
     vertical: z.string().default(''),
+    // Nor coordinates, before they were kept
+    latitude: z.number().min(-90).max(90).nullable().default(null),
+    longitude: z.number().min(-180).max(180).nullable().default(null),
   })
 )
 

@@ -36,6 +36,7 @@ interface FakePlace {
   rating?: number
   nationalPhoneNumber?: string
   formattedAddress?: string
+  location?: { latitude: number; longitude: number }
 }
 
 const textSearchPage = (
@@ -89,6 +90,8 @@ describe('routeStage2', () => {
     phone: '(512) 555-0100',
     address: '1 Test St',
     vertical: 'plumber',
+    latitude: null,
+    longitude: null,
   }
 
   it('routes no-website results to greenfield regardless of review count', () => {
@@ -151,15 +154,17 @@ describe('greenfieldLeadsToCsv', () => {
         reviewCount: 3,
         rating: 4.2,
         placeId: 'place-1',
+        latitude: 30.2672,
+        longitude: -97.7431,
       },
     ])
 
     const lines = csv.trim().split('\n')
     expect(lines[0]).toBe(
-      'business_name,phone,address,city,state,vertical,review_count,rating,place_id'
+      'business_name,phone,address,city,state,vertical,review_count,rating,place_id,latitude,longitude'
     )
     expect(lines[1]).toBe(
-      'Rosa\'s Diner,(512) 555-0100,"100 Main St, Austin, TX",Austin,TX,restaurant,3,4.2,place-1'
+      'Rosa\'s Diner,(512) 555-0100,"100 Main St, Austin, TX",Austin,TX,restaurant,3,4.2,place-1,30.2672,-97.7431'
     )
   })
 
@@ -175,6 +180,8 @@ describe('greenfieldLeadsToCsv', () => {
         reviewCount: 0,
         rating: null,
         placeId: 'place-2',
+        latitude: null,
+        longitude: null,
       },
     ])
     expect(csv).toContain('"The ""Best"" Shop"')
@@ -219,6 +226,7 @@ describe('fetchAllPagesForQuery', () => {
     expect(headers['X-Goog-Api-Key']).toBe('test-key')
     expect(headers['X-Goog-FieldMask']).toContain('nextPageToken')
     expect(headers['X-Goog-FieldMask']).toContain('places.websiteUri')
+    expect(headers['X-Goog-FieldMask']).toContain('places.location')
     expect(JSON.parse(String(firstInit.body))).toEqual({
       textQuery: 'plumber Austin TX',
       pageSize: 20,
@@ -271,6 +279,7 @@ describe('runDiscovery', () => {
             rating: 4.6,
             nationalPhoneNumber: '(512) 555-0101',
             formattedAddress: '1 Good St',
+            location: { latitude: 30.2672, longitude: -97.7431 },
           },
           {
             id: 'greenfield-1',
@@ -312,6 +321,8 @@ describe('runDiscovery', () => {
         city: 'Austin',
         state: 'TX',
         vertical: 'plumber',
+        latitude: 30.2672,
+        longitude: -97.7431,
       },
     ])
 
@@ -326,6 +337,8 @@ describe('runDiscovery', () => {
         reviewCount: 8,
         rating: 3.9,
         placeId: 'greenfield-1',
+        latitude: null,
+        longitude: null,
       },
     ])
 
@@ -407,6 +420,8 @@ const baseCandidate: ContinuingCandidate = {
   city: 'Austin',
   state: 'TX',
   vertical: 'plumber',
+  latitude: 30.2672,
+  longitude: -97.7431,
 }
 
 const MODERN_HTML = `<html><head>
@@ -556,7 +571,7 @@ describe('candidatesToCsv', () => {
         'old_jquery,old_wp_theme,no_og_tags,table_layout,ie_compatible,static_score,' +
         'psi_score,psi_performance,psi_seo,psi_accessibility,notes,vertical,' +
         'visual_points,static_v2_score,copyright_years_behind,no_srcset,inline_styles,' +
-        'psi_best_practices,psi_code,pitch'
+        'psi_best_practices,psi_code,pitch,latitude,longitude'
     )
   })
 
@@ -567,7 +582,7 @@ describe('candidatesToCsv', () => {
         'https://goodplumbing.example.com,50,false,true,,false,false,true,false,false,50,' +
         ',,,,"no_viewport, no_og_tags, psi: unavailable, visual: unavailable, ' +
         'composite without: visual code seo accessibility bestPractices",plumber,' +
-        ',60,,true,0,,,true'
+        ',60,,true,0,,,true,30.2672,-97.7431'
     )
   })
 
@@ -588,7 +603,7 @@ describe('candidatesToCsv', () => {
     expect(cells[6]).toBe('47.1')
     expect(cells[9]).toBe('2019-04-02')
     expect(row).toContain(',72.6,41.5,92,77.8,')
-    expect(row?.endsWith(',41,60,,true,0,96,60,true')).toBe(true)
+    expect(row?.endsWith(',41,60,,true,0,96,60,true,30.2672,-97.7431')).toBe(true)
   })
 })
 
@@ -612,9 +627,9 @@ describe('readContinuingCandidates', () => {
   it('reads a file written before candidates kept their vertical', async () => {
     const dir = await mkdtemp(path.join(tmpdir(), 'discover-'))
     const filePath = path.join(dir, 'continuing-candidates.json')
-    const { vertical: _vertical, ...legacy } = baseCandidate
+    const { vertical: _vertical, latitude: _latitude, longitude: _longitude, ...legacy } = baseCandidate
     await writeFile(filePath, JSON.stringify([legacy]), 'utf-8')
 
-    expect(await readContinuingCandidates(filePath)).toEqual([{ ...legacy, vertical: '' }])
+    expect(await readContinuingCandidates(filePath)).toEqual([{ ...legacy, vertical: '', latitude: null, longitude: null }])
   })
 })
