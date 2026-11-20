@@ -53,7 +53,10 @@ const serializeValue = (value: unknown, depth = 0): string => {
 // Strips plugin/widget markup from generic_section rawHtml down to readable
 // headings and paragraphs. Removes script/style tags, shortcodes, and elements
 // that have no text content after inner HTML is discarded.
-const sanitizeGenericHtml = (rawHtml: string): string => {
+// Headings in extracted HTML keep the old site's levels (an <h4> straight under the page's <h1>),
+// which screen readers and Lighthouse read as a skipped level. Each heading is placed at most one
+// level below the previous one, starting at `topLevel` (h2, or h3 under the section's own title).
+export const sanitizeGenericHtml = (rawHtml: string, topLevel = 2): string => {
   const $ = cheerio.load(rawHtml)
 
   // Remove scripts, styles, and WordPress shortcodes
@@ -61,21 +64,47 @@ const sanitizeGenericHtml = (rawHtml: string): string => {
 
   // Extract headings and paragraphs with non-empty text
   const parts: string[] = []
+  let previous = topLevel - 1
   $('h1, h2, h3, h4, h5, h6, p').each((_, el) => {
     const text = $(el).text().trim()
     // Skip empty, shortcode-only, or very short noise
     if (!text || text.startsWith('[') || text.length < 3) return
     const tag = (el as unknown as { name: string }).name
-    parts.push(`<${tag}>${text}</${tag}>`)
+    if (tag === 'p') {
+      parts.push(`<p>${text}</p>`)
+      return
+    }
+    const level = Math.min(Math.max(Number(tag.slice(1)), topLevel), previous + 1, 6)
+    previous = level
+    parts.push(`<h${level}>${text}</h${level}>`)
   })
 
   return parts.join('\n')
 }
 
+const iframeTitle = (src: string, id: string, fallback: string): string => {
+  const hint = `${src} ${id}`.toLowerCase()
+  if (/youtube|vimeo|wistia|video/.test(hint)) return 'Video'
+  if (/maps|map/.test(hint)) return 'Map'
+  return fallback
+}
+
+/** Every iframe gets a title so screen readers can say what it is (embeds from old sites rarely have one). */
+export const titleIframes = (html: string, fallback: string): string => {
+  const $ = cheerio.load(html, null, false)
+  $('iframe').each((_, el) => {
+    const frame = $(el)
+    if (frame.attr('title')?.trim()) return
+    frame.attr('title', iframeTitle(frame.attr('src') ?? '', frame.attr('id') ?? '', fallback))
+  })
+  return $.html()
+}
+
 const sanitizeBlock = (block: ContentBlock): ContentBlock => {
+  if (block.type === 'embed') return { ...block, embedHtml: titleIframes(block.embedHtml, block.heading ?? 'Embedded content') }
   if (block.type !== 'generic_section') return block
   const b = block as GenericSectionBlock
-  return { ...b, rawHtml: sanitizeGenericHtml(b.rawHtml) }
+  return { ...b, rawHtml: sanitizeGenericHtml(b.rawHtml, b.heading ? 3 : 2) }
 }
 
 // Blocks that own their own background (primary, black, etc.) — excluded from alternating rhythm

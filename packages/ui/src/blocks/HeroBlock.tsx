@@ -1,6 +1,8 @@
 import type { HeroBlock as HeroBlockData } from '@modernizer/schema'
 import { Button } from '../shadcn/button'
+import Image from 'next/image'
 import { cn } from '../lib/cn'
+import { skipOptimization } from '../lib/image'
 import { container } from '../styles/tokens'
 
 /**
@@ -79,7 +81,7 @@ export const HeroBlock = ({ block, variant = 'overlay', secondaryCta }: HeroBloc
   return (
     // Fills the first screen below the sticky header, so the next section never peeks in half cut
     <section className="relative flex min-h-[calc(100svh-4rem)] w-full overflow-hidden lg:min-h-[calc(100svh-5rem)]">
-      <img src={backgroundImageUrl} alt="" aria-hidden="true" className="absolute inset-0 h-full w-full object-cover object-center" />
+      <Image src={backgroundImageUrl} alt="" aria-hidden="true" fill priority sizes="100vw" unoptimized={skipOptimization(backgroundImageUrl)} className="object-cover object-center" />
       <div
         aria-hidden="true"
         className={cn(

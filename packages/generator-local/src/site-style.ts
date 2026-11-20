@@ -64,25 +64,3 @@ export const resolveSiteStyle = (schema: SiteSchema): SiteStyle => {
     headerPhone: profile.headerPhone ? phone : undefined,
   }
 }
-
-interface FontSetup {
-  imports: string
-  declarations: string
-  // Expression for <html className={...}>
-  className: string
-}
-
-/** next/font setup for the profile's heading and body fonts (one import when they match). */
-export const fontSetup = ({ theme }: VerticalProfile): FontSetup => {
-  const { headingFont, bodyFont } = theme
-  const same = headingFont.importName === bodyFont.importName
-  const names = same ? [headingFont.importName] : [headingFont.importName, bodyFont.importName]
-  const declarations = same
-    ? `const bodyFont = ${bodyFont.importName}({ subsets: ['latin'], display: 'swap', variable: '--font-body' })\nconst displayFont = ${headingFont.importName}({ subsets: ['latin'], display: 'swap', variable: '--font-display' })`
-    : `const displayFont = ${headingFont.importName}({ subsets: ['latin'], display: 'swap', variable: '--font-display' })\nconst bodyFont = ${bodyFont.importName}({ subsets: ['latin'], display: 'swap', variable: '--font-body' })`
-  return {
-    imports: `import { ${names.join(', ')} } from 'next/font/google'`,
-    declarations,
-    className: '`${displayFont.variable} ${bodyFont.variable}`',
-  }
-}

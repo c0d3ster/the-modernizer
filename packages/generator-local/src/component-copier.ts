@@ -9,7 +9,7 @@ const SCHEMA_SRC = join(dirname(fileURLToPath(import.meta.url)), '../../schema/s
 const IMPORT_REWRITES: Array<[RegExp, string]> = [
   [/from '@modernizer\/schema'/g, "from '@/types/schema'"],
   [/from '\.\.\/shadcn\//g, "from '@/components/shadcn/"],
-  [/from '\.\.\/lib\/cn'/g, "from '@/lib/cn'"],
+  [/from '\.\.\/lib\//g, "from '@/lib/"],
   [/from '\.\.\/styles\/tokens'/g, "from '@/styles/tokens'"],
 ]
 

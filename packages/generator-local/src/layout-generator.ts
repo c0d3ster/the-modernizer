@@ -1,6 +1,7 @@
 import type { SiteSchema, NavItem } from '@modernizer/schema'
 import { unwrapWaybackUrl } from './wayback-utils.js'
-import { fontSetup, type SiteStyle } from './site-style.js'
+import { fontSetup, generateMetadataExport } from '@modernizer/generator-config'
+import type { SiteStyle } from './site-style.js'
 
 const toRelative = (url: string, baseUrl: string): string | null => {
   if (!url || url === '#') return null
@@ -200,7 +201,7 @@ export const flattenNav = (nav: NavItem[], rootUrl: string): Array<{ label: stri
  * Footer contact props and nav cap without editing this file’s string shape for one-offs.
  */
 export const generateLayout = (schema: SiteSchema, style?: SiteStyle): string => {
-  const { siteName, tagline, rootUrl, pages } = schema
+  const { siteName, rootUrl, pages } = schema
   const navMaxItems = schema.generator?.navMaxItems ?? 7
   const resolvedRootUrl = unwrapWaybackUrl(rootUrl)
   const pagePathnames = new Set(
@@ -214,7 +215,6 @@ export const generateLayout = (schema: SiteSchema, style?: SiteStyle): string =>
   )
   const builtNav = buildNav(navSource(schema), rootUrl, pagePathnames, navMaxItems)
   const navLiteral = JSON.stringify(builtNav, null, 2)
-  const description = tagline ?? siteName
 
   const footerProps: string[] = []
   if (schema.footer?.phone) footerProps.push(`phone={${JSON.stringify(schema.footer.phone)}}`)
@@ -234,6 +234,7 @@ export const generateLayout = (schema: SiteSchema, style?: SiteStyle): string =>
   const navPropsStr = navProps.length > 0 ? ` ${navProps.join(' ')}` : ''
 
   return `import type { ReactElement, ReactNode } from 'react'
+import type { Metadata } from 'next'
 import { Navbar } from '@/components/layout/Navbar'
 import { Footer } from '@/components/layout/Footer'
 import type { NavItem } from '@/types/schema'
@@ -242,10 +243,7 @@ ${fonts ? `${fonts.imports}
 ${fonts ? `
 ${fonts.declarations}
 ` : ''}
-export const metadata = {
-  title: ${JSON.stringify(siteName)},
-  description: ${JSON.stringify(description)},
-}
+${generateMetadataExport(schema)}
 
 const nav: NavItem[] = ${navLiteral}
 

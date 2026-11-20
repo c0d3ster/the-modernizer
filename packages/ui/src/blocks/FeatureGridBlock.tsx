@@ -1,6 +1,8 @@
 import type { FeatureGridBlock as FeatureGridBlockData } from '@modernizer/schema'
 import { Card, CardHeader, CardTitle, CardDescription } from '../shadcn/card'
+import Image from 'next/image'
 import { cn } from '../lib/cn'
+import { skipOptimization } from '../lib/image'
 import { container, section } from '../styles/tokens'
 
 interface FeatureGridBlockProps {
@@ -21,7 +23,7 @@ export const FeatureGridBlock = ({ block }: FeatureGridBlockProps): React.ReactE
             <Card key={i} className="border-t-2 border-t-primary">
               <CardHeader>
                 {feature.iconUrl && (
-                  <img src={feature.iconUrl} alt="" className="mb-2 h-8 w-8" aria-hidden="true" />
+                  <Image src={feature.iconUrl} alt="" width={32} height={32} unoptimized={skipOptimization(feature.iconUrl)} className="mb-2 h-8 w-8 object-contain" aria-hidden="true" />
                 )}
                 <CardTitle>{feature.title}</CardTitle>
                 <CardDescription>{feature.description}</CardDescription>
