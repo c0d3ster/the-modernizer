@@ -1,6 +1,6 @@
 # PRD: Lead Map (the-modernizer side)
 
-Status: draft, 2026-11-27. The full PRD lives in c0d3ster: [`docs/prd/lead-map.md`](https://github.com/c0d3ster/c0d3ster/blob/main/docs/prd/lead-map.md). This doc holds only the modernizer's part, so `/discover-tasks --scan` in this repo finds it. The design background is in [`docs/lead-map-research.md`](../lead-map-research.md).
+Status: draft, 2026-11-27. The full PRD lives in c0d3ster: [`docs/prd/lead-map.md`](https://github.com/c0d3ster/c0d3ster/blob/main/docs/prd/lead-map.md). This doc holds only the modernizer's part, so `/discover-tasks` in this repo finds it. It replaces the earlier `docs/lead-map-research.md`, whose recommendation (a local CLI that pushes runs to c0d3ster) both PRDs adopt.
 
 ## Goal
 
@@ -12,6 +12,59 @@ The modernizer finds and scores local businesses (discovery, composite score, co
 - **Known leads:** `POST <C0D3STER_URL>/api/discovery/known` with the same token and `{ placeIds: string[] }` (max 500 per call). The response lists only the ids c0d3ster already has, each with `lastScoredAt`, `score` and `status`.
 - **Skip rule:** a known lead is not re-scored when its `status` is anything but `new`, or it was scored within `--rescore-after` days (default 90). `--rescore` forces a full re-score. Skipped leads count as `skipped_known_count`.
 - **Offline fallback:** `--skip-seen <dir...>` applies the same skip against earlier runs' output folders.
+
+## Export payload
+
+`DiscoveryRunExport`, version 1, defined with zod in `@modernizer/schema` next to the CSV contract it mirrors. c0d3ster validates it again with a vendored copy of the schema, so the package doesn't need publishing.
+
+```ts
+interface DiscoveryRunExport {
+  version: 1
+  runId: string            // e.g. "virginia-beach-va-2026-11-21"; makes a re-push idempotent
+  city: string
+  state: string
+  ranAt: string            // ISO timestamp
+  pitchThreshold: number   // 81 today; stored per run so old runs keep their meaning
+  coverage: {
+    foundCount: number         // raw results across all queries
+    dedupedCount: number
+    filteredCount: number      // chains and review-count bounds
+    skippedKnownCount: number
+    scoredCount: number
+    unreachableCount: number
+    pitchCount: number
+    truncatedQueries: string[] // queries that hit the 60-result cap
+  }
+  leads: Lead[]
+}
+
+interface Lead {
+  placeId: string          // stable Google id: the upsert key across runs
+  name: string
+  kind: 'scored' | 'greenfield' | 'unreachable'
+  vertical: string
+  phone: string
+  address: string
+  latitude: number | null
+  longitude: number | null
+  url: string | null
+  reviewCount: number
+  rating: number | null
+  score: number | null     // composite; null for greenfield and unreachable
+  pitch: boolean | null
+  signals: {               // the breakdown, for the lead's detail panel and the pitch
+    visual: number | null
+    staticV2: number | null
+    code: number | null
+    seo: number | null
+    accessibility: number | null
+    bestPractices: number | null
+    performance: number | null   // not in the score; a talking point
+  } | null
+  notes: string            // e.g. "no_ssl, copyright 9 years behind"
+  screenshotUrl: string | null   // optional, uploaded to R2 on push
+}
+```
 
 ## Run coverage
 
@@ -30,7 +83,7 @@ Stacks: `discovery: M1 -> M2 -> M3`, `handoff: M4 -> M5`, `solo: M6, M7`.
 
 **M3: Skip known leads, local.** `--skip-seen <dir...>` drops `place_id`s found in earlier runs' output before scoring, and reports the skipped count. Acceptance: tests with fixture run directories.
 
-**M4: `DiscoveryRunExport` schema and `push-run`.** Zod schema v1 in `@modernizer/schema`, including the coverage counts; `pnpm push-run <dir>` builds it from a run's output and POSTs it with the token; `--dry-run` writes `leads.json` instead. Acceptance: schema tests, and `push-run` tests with a mocked fetch for success, 401 and 400.
+**M4: `DiscoveryRunExport` schema and `push-run`.** Zod schema v1 in `@modernizer/schema` per "Export payload" above; `pnpm push-run <dir>` builds it from a run's output and POSTs it with the token; `--dry-run` writes `leads.json` instead. Acceptance: schema tests, and `push-run` tests with a mocked fetch for success, 401 and 400.
 
 **M5: Skip known leads via c0d3ster.** With `C0D3STER_URL` and the token set, known leads come from `/api/discovery/known` (batched by 500) and the skip rule applies (`--rescore-after`, `--rescore`); falls back to `--skip-seen` when unset or unreachable. Depends on M3, M4, and c0d3ster's known-leads route (c0d3ster PRD issue 3a). Acceptance: tests with a mocked fetch.
 
